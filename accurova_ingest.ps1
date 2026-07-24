@@ -1,6 +1,6 @@
 # ============================================================
 #  ACCUROVA INGEST - Nikon D850 (Windows)
-#  v0.6.0 - Fixed toggle controls
+#  v1.0.0 - 360 camera support, two-column layout, fixed toggles
 # ============================================================
 
 Add-Type -AssemblyName System.Windows.Forms

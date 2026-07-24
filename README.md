@@ -42,16 +42,39 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 
 ## Changelog
 
-All notable changes to this project are documented here, newest first.
+All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
 
 ### [1.0.0] - 2026-07-25
-- First tracked release of the public repo (git-backed versioning starts here)
+- First tracked release of the public repo (git-backed versioning starts here); code already includes everything through 0.8.0 below
+
+### [0.8.0] - 2026-03-14
+- 360 camera file support — `.lrv`/`.insv` ingested as a third file type, nested into a `360` subfolder within the date folder; skipped silently if none found; included in progress tracking, verification, and summary
+
+### [0.7.0] - 2026-03-14
+- Two-column layout — form widened to 1140×760px; output log moved to a full-height right panel with a vertical divider
 
 ### [0.6.0] - 2026-03-14
-- Fixed toggle controls (Eject / Dry run) that were not updating state correctly
+- Fixed toggle controls and Browse buttons — WinForms closure scoping bugs caused the eject/dry run toggles and Browse buttons to crash at runtime; toggles inlined with explicit `$script:` scoped state, Browse buttons fixed by storing the textbox reference in `$this.Tag`
 
-### [0.1.0] - 2026-03-10
-- Initial version of the ingest script and config
+### [0.5.0] - 2026-03-10
+- In-UI config with JSON persistence — vault destination, log folder, and ExifTool path moved into editable fields with Browse buttons; config saved to `accurova_config.json` next to the script and reloaded on next launch; log folder auto-updates when vault path changes
+
+### [0.4.0] - date unknown
+- Progress bar, per-file transfer speed, and ETA calculated from bytes transferred vs. total
+- Pre-flight storage check with continue/cancel dialog
+- Vault indexed on startup; duplicate files skipped and logged
+- SD card auto-detected by scanning for removable drives with a `DCIM` folder
+- Dry run toggle to simulate the full pipeline without touching any files
+- Post-ingest verification comparing source vs. destination file counts, flagging missing files, confirming safe-to-format
+
+### [0.3.0] - date unknown
+- GUI wrapper — replaced terminal interaction with a WinForms dark-themed UI: event name and location fields, SD card drive dropdown, eject checkbox, live output log panel, Stop button, status label
+
+### [0.2.0] - date unknown
+- Ported to PowerShell (Windows) — rebuilt entirely for Windows, same logic as the original shell script, PowerShell-native syntax, `.ps1` file
+
+### [0.1.0] - date unknown (predecessor, not in this repo)
+- Initial concept as a bash shell script on Mac using ExifTool: sorted NEFs and MP4s by EXIF date, rescued orphan JPGs, logged output, optionally ejected the SD card
 
 ## Future Roadmap
 
