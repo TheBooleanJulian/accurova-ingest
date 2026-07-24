@@ -1,6 +1,6 @@
 # ============================================================
 #  ACCUROVA INGEST - Nikon D850 (Windows)
-#  v1.0.0 - Fixed toggle controls
+#  v0.6.0 - Fixed toggle controls
 # ============================================================
 
 Add-Type -AssemblyName System.Windows.Forms
