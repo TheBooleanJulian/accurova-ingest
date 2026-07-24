@@ -46,10 +46,10 @@ All notable changes to this project are documented here, newest first.
 
 ### [1.0.0] - 2026-07-25
 - First tracked release of the public repo (git-backed versioning starts here)
+- Fixed toggle controls (Eject / Dry run) that were not updating state correctly
 
 ### [0.1.0] - 2026-03-10
 - Initial version of the ingest script and config
-- Fixed toggle controls (Eject / Dry run) that were not updating state correctly
 
 ## Future Roadmap
 
