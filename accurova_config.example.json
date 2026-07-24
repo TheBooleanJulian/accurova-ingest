@@ -1,0 +1,5 @@
+{
+    "Dest":  "C:\\Users\\<you>\\Pictures\\Accurova",
+    "Exiftool":  "C:\\exiftool\\exiftool.exe",
+    "LogDir":  "C:\\Users\\<you>\\Pictures\\Accurova\\_logs"
+}

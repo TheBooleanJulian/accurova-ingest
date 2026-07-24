@@ -1,0 +1,6 @@
+# Local machine config (vault paths, exiftool location) - personal to each install
+accurova_config.json
+
+# Ingest logs
+_logs/
+*.log
