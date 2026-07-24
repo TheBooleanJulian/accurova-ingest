@@ -1,36 +1,76 @@
+<div align="center">
+
 # Accurova Ingest
 
-A Windows PowerShell GUI utility for ingesting photos and video from Nikon D850 SD cards (plus 360-camera footage) into a dated vault folder structure, using ExifTool to sort files by capture date, skip duplicates, and verify the copy before you format the card.
+**A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
+
+![Version](https://img.shields.io/badge/version-1.0.0-00D4C8)
+![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
+![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
+
+</div>
+
+---
+
+## What it does
+
+Accurova Ingest is a Windows PowerShell GUI utility for photographers shooting with a Nikon D850 (and 360 cameras). It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts NEFs, MP4s, and 360 footage into a structured vault (`Dest\YYYY_MM\YYYY_MM_DD [Event] [Location]\`) — skipping duplicates, flagging orphan JPGs, and verifying the copy before you format the card. Config is persisted to a local JSON file so your vault path, log folder, and ExifTool location are remembered between runs.
 
 ## Features
 
-- Auto-detects the SD card (looks for a `DCIM` folder on removable drives)
-- Sorts NEFs, MP4s, and 360 footage (`.lrv` / `.insv`) into `Dest\YYYY_MM\YYYY_MM_DD [Event] [Location]\` using EXIF capture date
+- Auto-detects SD card by looking for a `DCIM` folder on removable drives
+- Sorts NEFs, MP4s, and 360 footage (`.lrv` / `.insv`) into dated vault folders using EXIF capture date
 - Duplicate detection against the existing vault before copying
 - Orphan JPG detection (JPGs with no matching NEF)
-- Dry run mode — simulate a full ingest with no files copied
-- Live progress: percentage, speed, ETA, current file
-- Storage space check before starting a live ingest
-- Post-ingest verification (source vs. destination file/byte counts)
-- Optional SD card eject when the ingest completes
-- Persisted config (`accurova_config.json`) for vault destination, log folder, and ExifTool path
+- Dry run mode — full simulation with no files copied
+- Live progress: percentage, speed, ETA, and current file
+- Pre-flight storage space check with continue/cancel dialog
+- Post-ingest verification (source vs. destination file and byte counts)
+- Optional SD card eject on completion
+- Persisted config (`accurova_config.json`) for vault path, log folder, and ExifTool path
+
+## Tech Stack
+
+| Layer | Choice |
+|---|---|
+| Script | PowerShell (WinForms GUI) |
+| EXIF parsing | ExifTool |
+
+## Quick Start
+
+1. Copy `accurova_config.example.json` to `accurova_config.json` in the same folder as the script and adjust the paths, or set them from the UI after launching.
+2. Run `accurova_ingest.ps1`.
+3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths, then click **Save Paths**.
+4. Optionally enter an **Event Name** / **Location** — appended to each day's folder name.
+5. Confirm the detected **SD Card Drive** (or pick manually).
+6. Toggle **Dry run** to preview without copying, and/or **Eject SD card after ingest**.
+7. Click **START INGEST**.
 
 ## Requirements
 
 - Windows with PowerShell
-- [ExifTool](https://exiftool.org/) installed somewhere accessible (path is configurable in the app)
+- [ExifTool](https://exiftool.org/) installed and its path set in config or the UI
 
-## Usage
+## Configuration
 
-1. Copy [`accurova_config.example.json`](accurova_config.example.json) to `accurova_config.json` (in the same folder as the script) and adjust the paths, or just launch the app and set them from the UI.
-2. Run `accurova_ingest.ps1`.
-3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths, and click **Save Paths**.
-3. Optionally enter an **Event Name** / **Location** — these are appended to each day's destination folder name.
-4. Confirm the detected **SD Card Drive** (or pick manually).
-5. Toggle **Dry run** to preview the ingest without copying anything, and/or **Eject SD card after ingest**.
-6. Click **START INGEST**.
+| Field | Required | Description |
+|---|---|---|
+| `Dest` | Yes | Root path of your photo vault |
+| `LogDir` | Yes | Where ingest logs are written |
+| `Exiftool` | Yes | Full path to the ExifTool executable |
 
-Config is stored in `accurova_config.json` next to the script.
+Config is stored in `accurova_config.json` next to the script. Copy `accurova_config.example.json` to get started.
+
+## Project Structure
+
+```
+accurova-ingest/
+|-- accurova_ingest.ps1
+|-- accurova_config.example.json
+|-- LICENSE
+|-- COMMERCIAL-LICENSE.md
+`-- README.md
+```
 
 ## Versioning
 
@@ -39,6 +79,32 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 - **MAJOR** — breaking changes to config format, folder structure, or workflow that require user action
 - **MINOR** — new features that are backward compatible (new toggles, new file types, new UI sections)
 - **PATCH** — bug fixes and small tweaks with no behavior change for existing users
+
+## Status / Roadmap
+
+**Done**
+
+- [x] EXIF-based date sorting for NEF, MP4, LRV, and INSV files
+- [x] Duplicate detection and orphan JPG flagging
+- [x] Dry run mode and live progress reporting
+- [x] Post-ingest verification and optional SD card eject
+- [x] Persisted JSON config with in-UI editing
+- [x] Two-column WinForms layout with live output log
+- [x] 360 footage ingested into a `360` subfolder per day
+
+**Planned / Suggestions**
+
+- **Config profiles** — support multiple named destination/camera profiles (e.g. different bodies, different vault drives) instead of a single global config
+- **Additional camera support** — generalize the file-type/extension list beyond D850 (NEF/MP4/LRV/INSV) so other bodies can be ingested without editing the script
+- **Checksum verification** — optional hash-based verification pass instead of (or in addition to) filename/size matching, for stronger integrity guarantees before formatting the card
+- **Resume/retry on interruption** — recover cleanly from a killed process or dropped SD card mid-ingest instead of requiring a full re-run
+- **Structured logging** — write machine-readable (JSON/CSV) ingest logs alongside the human-readable log for easier auditing over time
+- **Packaging** — distribute as a signed `.exe` (e.g. via ps2exe) so it can run without an explicit PowerShell execution policy change
+- **Cross-platform ingest core** — split the ingest/verify logic from the WinForms UI so a CLI-only mode is possible on non-Windows setups running PowerShell Core
+- No `.env.example` equivalent is provided for the PowerShell config path defaults — a setup script or first-run wizard could reduce manual config steps
+- No automated tests for ingest logic (duplicate detection, path construction, verification counts)
+
+Suggestions and feedback welcome — open an issue or reach out directly.
 
 ## Changelog
 
@@ -75,20 +141,6 @@ All notable changes to this project are documented here, newest first. Versions 
 
 ### [0.1.0] - date unknown (predecessor, not in this repo)
 - Initial concept as a bash shell script on Mac using ExifTool: sorted NEFs and MP4s by EXIF date, rescued orphan JPGs, logged output, optionally ejected the SD card
-
-## Future Roadmap
-
-Ideas under consideration for future releases — not commitments, just a running list:
-
-- **Config profiles** — support multiple named destination/camera profiles (e.g. different bodies, different vault drives) instead of a single global config
-- **Additional camera support** — generalize the file-type/extension list beyond D850 (NEF/MP4/LRV/INSV) so other bodies can be ingested without editing the script
-- **Checksum verification** — optional hash-based verification pass instead of (or in addition to) filename/size matching, for stronger integrity guarantees before formatting the card
-- **Resume/retry on interruption** — recover cleanly from a killed process or dropped SD card mid-ingest instead of requiring a full re-run
-- **Structured logging** — write machine-readable (JSON/CSV) ingest logs alongside the human-readable log for easier auditing over time
-- **Packaging** — distribute as a signed `.exe` (e.g. via ps2exe) so it can run without an explicit PowerShell execution policy change
-- **Cross-platform ingest core** — split the ingest/verify logic from the WinForms UI so a CLI-only mode is possible on non-Windows setups running PowerShell Core
-
-Suggestions and feedback welcome — open an issue or reach out directly.
 
 ## License
 
