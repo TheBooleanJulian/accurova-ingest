@@ -44,14 +44,14 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 
 All notable changes to this project are documented here, newest first.
 
-### [6.0.0] - 2026-03-14
+### [1.0.0] - 2026-07-25
+- First tracked release of the public repo (git-backed versioning starts here)
 - Fixed toggle controls (Eject / Dry run) that were not updating state correctly
 
 ## Future Roadmap
 
 Ideas under consideration for future releases — not commitments, just a running list:
 
-- **Git-backed versioning** — initialize this as a git repo so version bumps and changelog entries can be tied to actual commit/tag history instead of maintained by hand
 - **Config profiles** — support multiple named destination/camera profiles (e.g. different bodies, different vault drives) instead of a single global config
 - **Additional camera support** — generalize the file-type/extension list beyond D850 (NEF/MP4/LRV/INSV) so other bodies can be ingested without editing the script
 - **Checksum verification** — optional hash-based verification pass instead of (or in addition to) filename/size matching, for stronger integrity guarantees before formatting the card
