@@ -1,6 +1,8 @@
 # ============================================================
-#  ACCUROVA INGEST - Nikon D850 (Windows)
-#  v1.0.0 - 360 camera support, two-column layout, fixed toggles
+#  ACCUROVA INGEST (Windows)
+#  Camera-agnostic SD card ingest: sort by EXIF date, dedupe,
+#  verify, ready to format. Configure your RAW/video/aux file
+#  extensions in the FILE TYPES section to match your camera.
 # ============================================================
 
 Add-Type -AssemblyName System.Windows.Forms
@@ -14,18 +16,48 @@ function LoadConfig {
     if (Test-Path $ConfigFile) {
         try {
             $raw = Get-Content $ConfigFile -Raw | ConvertFrom-Json
-            return @{ Dest = $raw.Dest; LogDir = $raw.LogDir; Exiftool = $raw.Exiftool }
+            return @{
+                Dest     = $raw.Dest
+                LogDir   = $raw.LogDir
+                Exiftool = $raw.Exiftool
+                RawExt   = if ($raw.RawExt)   { $raw.RawExt }   else { "nef" }
+                VideoExt = if ($raw.VideoExt) { $raw.VideoExt } else { "mp4" }
+                AuxExt   = $raw.AuxExt
+            }
         } catch {}
     }
     return @{
-        Dest     = "$env:USERPROFILE\Pictures\Accurova"
-        LogDir   = "$env:USERPROFILE\Pictures\Accurova\_logs"
+        Dest     = "$env:USERPROFILE\Pictures\PhotoVault"
+        LogDir   = "$env:USERPROFILE\Pictures\PhotoVault\_logs"
         Exiftool = "C:\exiftool\exiftool.exe"
+        RawExt   = "nef"
+        VideoExt = "mp4"
+        AuxExt   = ""
     }
 }
 
-function SaveConfig($dest, $logDir, $exiftool) {
-    @{ Dest = $dest; LogDir = $logDir; Exiftool = $exiftool } | ConvertTo-Json | Set-Content $ConfigFile -Encoding utf8
+function SaveConfig($dest, $logDir, $exiftool, $rawExt, $videoExt, $auxExt) {
+    @{
+        Dest     = $dest
+        LogDir   = $logDir
+        Exiftool = $exiftool
+        RawExt   = $rawExt
+        VideoExt = $videoExt
+        AuxExt   = $auxExt
+    } | ConvertTo-Json | Set-Content $ConfigFile -Encoding utf8
+}
+
+# Parses a comma-separated extension list ("nef, cr2 , .arw") into a clean
+# lowercase array without dots ("nef","cr2","arw"), so users can paste
+# whatever format they're used to.
+function ParseExtList($raw) {
+    if (-not $raw) { return @() }
+    return @($raw -split "," | ForEach-Object { $_.Trim().TrimStart(".").ToLower() } | Where-Object { $_ -ne "" })
+}
+
+function GetFilesByExt($path, $extList) {
+    if ($extList.Count -eq 0) { return @() }
+    return @(Get-ChildItem -Path $path -Recurse -Include ($extList | ForEach-Object { "*.$_" }) -ErrorAction SilentlyContinue)
 }
 
 $Config = LoadConfig
@@ -50,7 +82,7 @@ $FONT_LOG = New-Object System.Drawing.Font("Consolas", 8.5)
 # -- FORM ----------------------------------------------------
 $Form = New-Object System.Windows.Forms.Form
 $Form.Text            = "Accurova Ingest"
-$Form.Size            = New-Object System.Drawing.Size(1140, 760)
+$Form.Size            = New-Object System.Drawing.Size(1140, 880)
 $Form.StartPosition   = "CenterScreen"
 $Form.BackColor       = $BG
 $Form.ForeColor       = $FG
@@ -60,13 +92,13 @@ $Form.MaximizeBox     = $false
 $Form.ShowInTaskbar   = $true
 
 # -- HELPERS -------------------------------------------------
-function MakeLabel($text, $x, $y) {
+function MakeLabel($text, $x, $y, $w = 300) {
     $l = New-Object System.Windows.Forms.Label
     $l.Text      = $text
     $l.Font      = $FONT_LBL
     $l.ForeColor = $FG_DIM
     $l.Location  = New-Object System.Drawing.Point($x, $y)
-    $l.Size      = New-Object System.Drawing.Size(300, 18)
+    $l.Size      = New-Object System.Drawing.Size($w, 18)
     return $l
 }
 
@@ -189,7 +221,7 @@ $LblTitle.Size      = New-Object System.Drawing.Size(200, 36)
 $Form.Controls.Add($LblTitle)
 
 $LblSub = New-Object System.Windows.Forms.Label
-$LblSub.Text      = "D850 INGEST UTILITY"
+$LblSub.Text      = "SD CARD INGEST UTILITY"
 $LblSub.Font      = $FONT_SUB
 $LblSub.ForeColor = $FG_DIM
 $LblSub.Location  = New-Object System.Drawing.Point(26, 52)
@@ -249,32 +281,61 @@ $LblSaveStatus.Size      = New-Object System.Drawing.Size(300, 18)
 $Form.Controls.Add($LblSaveStatus)
 
 $BtnSaveConfig.Add_Click({
-    SaveConfig $DestBox.TextBox.Text.Trim() $LogBox.TextBox.Text.Trim() $ExifBox.TextBox.Text.Trim()
+    $auxVal = if ($TxtAuxExt.Text -eq $TxtAuxExt.Tag) { "" } else { $TxtAuxExt.Text.Trim() }
+    SaveConfig $DestBox.TextBox.Text.Trim() $LogBox.TextBox.Text.Trim() $ExifBox.TextBox.Text.Trim() $TxtRawExt.Text.Trim() $TxtVideoExt.Text.Trim() $auxVal
     $LblSaveStatus.Text = "Saved."
     $timer = New-Object System.Windows.Forms.Timer
     $timer.Interval = 2000
-    $timer.Add_Tick({ $LblSaveStatus.Text = ""; $timer.Stop() })
+    $timer.Add_Tick({ $LblSaveStatus.Text = ""; $this.Stop() })
     $timer.Start()
 })
 
 AddDivider 314
 
 # ============================================================
+#  SECTION: FILE TYPES  (camera-agnostic - configure per camera)
+# ============================================================
+AddSectionHeader "  FILE TYPES" 324
+
+$Form.Controls.Add((MakeLabel "RAW EXTENSIONS" 24 354 208))
+$TxtRawExt = MakeTextBox 24 372 196 $Config.RawExt
+$Form.Controls.Add($TxtRawExt)
+
+$Form.Controls.Add((MakeLabel "VIDEO EXTENSIONS" 240 354 208))
+$TxtVideoExt = MakeTextBox 240 372 196 $Config.VideoExt
+$Form.Controls.Add($TxtVideoExt)
+
+$Form.Controls.Add((MakeLabel "AUX EXT. (optional)" 456 354 196))
+$TxtAuxExt = MakePlaceholderTextBox 456 372 196 "e.g. lrv, insv"
+if ($Config.AuxExt) { $TxtAuxExt.Text = $Config.AuxExt; $TxtAuxExt.ForeColor = $FG }
+$Form.Controls.Add($TxtAuxExt)
+
+$LblFileTypesHint = New-Object System.Windows.Forms.Label
+$LblFileTypesHint.Text      = "Comma-separated, no dots. RAW example: nef, cr2, cr3, arw, raf, orf, rw2, dng.  AUX = proxy/360 footage, e.g. GoPro/Insta360 .lrv/.insv"
+$LblFileTypesHint.Font      = $FONT_SUB
+$LblFileTypesHint.ForeColor = $FG_DIM
+$LblFileTypesHint.Location  = New-Object System.Drawing.Point(24, 402)
+$LblFileTypesHint.Size      = New-Object System.Drawing.Size(628, 18)
+$Form.Controls.Add($LblFileTypesHint)
+
+AddDivider 434
+
+# ============================================================
 #  SECTION: SESSION
 # ============================================================
-AddSectionHeader "  SESSION" 324
+AddSectionHeader "  SESSION" 444
 
-$Form.Controls.Add((MakeLabel "EVENT NAME" 24 354))
-$TxtEvent = MakePlaceholderTextBox 24 372 400 "e.g. FAF Day 2"
+$Form.Controls.Add((MakeLabel "EVENT NAME" 24 474))
+$TxtEvent = MakePlaceholderTextBox 24 492 400 "e.g. FAF Day 2"
 $Form.Controls.Add($TxtEvent)
 
-$Form.Controls.Add((MakeLabel "LOCATION" 24 408))
-$TxtLocation = MakePlaceholderTextBox 24 426 400 "e.g. Kallang Leisure Park"
+$Form.Controls.Add((MakeLabel "LOCATION" 24 528))
+$TxtLocation = MakePlaceholderTextBox 24 546 400 "e.g. Kallang Leisure Park"
 $Form.Controls.Add($TxtLocation)
 
-$Form.Controls.Add((MakeLabel "SD CARD DRIVE" 24 462))
+$Form.Controls.Add((MakeLabel "SD CARD DRIVE" 24 582))
 $CmbDrive = New-Object System.Windows.Forms.ComboBox
-$CmbDrive.Location      = New-Object System.Drawing.Point(24, 480)
+$CmbDrive.Location      = New-Object System.Drawing.Point(24, 600)
 $CmbDrive.Size          = New-Object System.Drawing.Size(100, 26)
 $CmbDrive.BackColor     = $PANEL
 $CmbDrive.ForeColor     = $FG
@@ -289,7 +350,7 @@ $LblAutoDetect = New-Object System.Windows.Forms.Label
 $LblAutoDetect.Text      = "Scanning drives..."
 $LblAutoDetect.Font      = $FONT_SUB
 $LblAutoDetect.ForeColor = $FG_DIM
-$LblAutoDetect.Location  = New-Object System.Drawing.Point(136, 484)
+$LblAutoDetect.Location  = New-Object System.Drawing.Point(136, 604)
 $LblAutoDetect.Size      = New-Object System.Drawing.Size(300, 18)
 $Form.Controls.Add($LblAutoDetect)
 
@@ -297,7 +358,7 @@ $Form.Controls.Add($LblAutoDetect)
 $script:EjectChecked = $false
 
 $EjectTrack = New-Object System.Windows.Forms.Panel
-$EjectTrack.Location  = New-Object System.Drawing.Point(24, 516)
+$EjectTrack.Location  = New-Object System.Drawing.Point(24, 636)
 $EjectTrack.Size      = New-Object System.Drawing.Size(36, 18)
 $EjectTrack.BackColor = $PANEL
 $EjectTrack.Cursor    = "Hand"
@@ -313,7 +374,7 @@ $EjectLabel = New-Object System.Windows.Forms.Label
 $EjectLabel.Text      = "Eject SD card after ingest"
 $EjectLabel.Font      = $FONT_SUB
 $EjectLabel.ForeColor = $FG_DIM
-$EjectLabel.Location  = New-Object System.Drawing.Point(68, 517)
+$EjectLabel.Location  = New-Object System.Drawing.Point(68, 637)
 $EjectLabel.Size      = New-Object System.Drawing.Size(300, 18)
 $EjectLabel.Cursor    = "Hand"
 
@@ -338,37 +399,10 @@ $EjectTrack.Add_Click($EjectToggle)
 $EjectThumb.Add_Click($EjectToggle)
 $EjectLabel.Add_Click($EjectToggle)
 
-# -- DRY RUN TOGGLE (inlined) --------------------------------
-$script:DryRunChecked = $false
-
-$DryTrack = New-Object System.Windows.Forms.Panel
-$DryTrack.Location  = New-Object System.Drawing.Point(24, 542)
-$DryTrack.Size      = New-Object System.Drawing.Size(36, 18)
-$DryTrack.BackColor = $PANEL
-$DryTrack.Cursor    = "Hand"
-
-$DryThumb = New-Object System.Windows.Forms.Panel
-$DryThumb.Size      = New-Object System.Drawing.Size(12, 12)
-$DryThumb.Location  = New-Object System.Drawing.Point(3, 3)
-$DryThumb.BackColor = $FG_DIM
-$DryThumb.Cursor    = "Hand"
-$DryTrack.Controls.Add($DryThumb)
-
-$DryLabel = New-Object System.Windows.Forms.Label
-$DryLabel.Text      = "Dry run (simulate only - no files will be copied)"
-$DryLabel.Font      = $FONT_SUB
-$DryLabel.ForeColor = $FG_DIM
-$DryLabel.Location  = New-Object System.Drawing.Point(68, 543)
-$DryLabel.Size      = New-Object System.Drawing.Size(350, 18)
-$DryLabel.Cursor    = "Hand"
-
-$Form.Controls.Add($DryTrack)
-$Form.Controls.Add($DryLabel)
-
-# Dry run banner (defined before toggle so toggle can reference it)
+# Dry run banner - shown while a dry run is in progress
 $DryRunBanner = New-Object System.Windows.Forms.Panel
 $DryRunBanner.BackColor = [System.Drawing.Color]::FromArgb(60, 50, 0)
-$DryRunBanner.Location  = New-Object System.Drawing.Point(24, 570)
+$DryRunBanner.Location  = New-Object System.Drawing.Point(24, 662)
 $DryRunBanner.Size      = New-Object System.Drawing.Size(628, 24)
 $DryRunBanner.Visible   = $false
 $LblDryRunBanner = New-Object System.Windows.Forms.Label
@@ -381,46 +415,42 @@ $LblDryRunBanner.Size      = New-Object System.Drawing.Size(628, 18)
 $DryRunBanner.Controls.Add($LblDryRunBanner)
 $Form.Controls.Add($DryRunBanner)
 
-$DryToggle = {
-    $script:DryRunChecked = -not $script:DryRunChecked
-    if ($script:DryRunChecked) {
-        $DryTrack.BackColor   = $TEAL
-        $DryThumb.BackColor   = $BG
-        $DryThumb.Location    = New-Object System.Drawing.Point(21, 3)
-        $DryLabel.ForeColor   = $FG
-        $DryRunBanner.Visible = $true
-    } else {
-        $DryTrack.BackColor   = $PANEL
-        $DryThumb.BackColor   = $FG_DIM
-        $DryThumb.Location    = New-Object System.Drawing.Point(3, 3)
-        $DryLabel.ForeColor   = $FG_DIM
-        $DryRunBanner.Visible = $false
-    }
-}
-$DryTrack.Add_Click($DryToggle)
-$DryThumb.Add_Click($DryToggle)
-$DryLabel.Add_Click($DryToggle)
-
-AddDivider 604
+AddDivider 724
 
 # ============================================================
 #  BUTTONS
 # ============================================================
-$BtnRun = New-Object System.Windows.Forms.Button
-$BtnRun.Text      = "START INGEST"
-$BtnRun.Location  = New-Object System.Drawing.Point(24, 614)
-$BtnRun.Size      = New-Object System.Drawing.Size(180, 38)
-$BtnRun.BackColor = $TEAL
-$BtnRun.ForeColor = $BG
-$BtnRun.FlatStyle = "Flat"
-$BtnRun.Font      = New-Object System.Drawing.Font("Segoe UI Semibold", 9.5)
-$BtnRun.FlatAppearance.BorderSize = 0
-$BtnRun.Cursor    = "Hand"
-$Form.Controls.Add($BtnRun)
+$GOLD = [System.Drawing.Color]::FromArgb(212, 175, 55)
+
+$BtnDryRun = New-Object System.Windows.Forms.Button
+$BtnDryRun.Text      = "START DRY RUN"
+$BtnDryRun.Location  = New-Object System.Drawing.Point(24, 734)
+$BtnDryRun.Size      = New-Object System.Drawing.Size(170, 38)
+$BtnDryRun.BackColor = $PANEL
+$BtnDryRun.ForeColor = $FG
+$BtnDryRun.FlatStyle = "Flat"
+$BtnDryRun.Font      = New-Object System.Drawing.Font("Segoe UI Semibold", 9.5)
+$BtnDryRun.FlatAppearance.BorderColor = $FG_DIM
+$BtnDryRun.FlatAppearance.BorderSize  = 1
+$BtnDryRun.Cursor    = "Hand"
+$Form.Controls.Add($BtnDryRun)
+
+$BtnLiveIngest = New-Object System.Windows.Forms.Button
+$BtnLiveIngest.Text      = "START LIVE INGEST"
+$BtnLiveIngest.Location  = New-Object System.Drawing.Point(204, 734)
+$BtnLiveIngest.Size      = New-Object System.Drawing.Size(170, 38)
+$BtnLiveIngest.BackColor = $TEAL
+$BtnLiveIngest.ForeColor = $BG
+$BtnLiveIngest.FlatStyle = "Flat"
+$BtnLiveIngest.Font      = New-Object System.Drawing.Font("Segoe UI Semibold", 9.5)
+$BtnLiveIngest.FlatAppearance.BorderColor = $GOLD
+$BtnLiveIngest.FlatAppearance.BorderSize  = 2
+$BtnLiveIngest.Cursor    = "Hand"
+$Form.Controls.Add($BtnLiveIngest)
 
 $BtnStop = New-Object System.Windows.Forms.Button
 $BtnStop.Text      = "STOP"
-$BtnStop.Location  = New-Object System.Drawing.Point(214, 614)
+$BtnStop.Location  = New-Object System.Drawing.Point(384, 734)
 $BtnStop.Size      = New-Object System.Drawing.Size(80, 38)
 $BtnStop.BackColor = $RED
 $BtnStop.ForeColor = $FG
@@ -435,17 +465,17 @@ $LblStatus = New-Object System.Windows.Forms.Label
 $LblStatus.Text      = "Ready."
 $LblStatus.Font      = $FONT_SUB
 $LblStatus.ForeColor = $FG_DIM
-$LblStatus.Location  = New-Object System.Drawing.Point(308, 626)
-$LblStatus.Size      = New-Object System.Drawing.Size(344, 18)
+$LblStatus.Location  = New-Object System.Drawing.Point(484, 746)
+$LblStatus.Size      = New-Object System.Drawing.Size(168, 18)
 $Form.Controls.Add($LblStatus)
 
-AddDivider 662
+AddDivider 782
 
 # ============================================================
 #  PROGRESS
 # ============================================================
 $ProgressBar = New-Object System.Windows.Forms.ProgressBar
-$ProgressBar.Location  = New-Object System.Drawing.Point(24, 672)
+$ProgressBar.Location  = New-Object System.Drawing.Point(24, 792)
 $ProgressBar.Size      = New-Object System.Drawing.Size(628, 14)
 $ProgressBar.Minimum   = 0
 $ProgressBar.Maximum   = 100
@@ -459,7 +489,7 @@ $LblPct = New-Object System.Windows.Forms.Label
 $LblPct.Text      = "0%"
 $LblPct.Font      = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
 $LblPct.ForeColor = $TEAL
-$LblPct.Location  = New-Object System.Drawing.Point(24, 694)
+$LblPct.Location  = New-Object System.Drawing.Point(24, 814)
 $LblPct.Size      = New-Object System.Drawing.Size(60, 18)
 $Form.Controls.Add($LblPct)
 
@@ -467,7 +497,7 @@ $LblFiles = New-Object System.Windows.Forms.Label
 $LblFiles.Text      = "0 / 0 files"
 $LblFiles.Font      = $FONT_SUB
 $LblFiles.ForeColor = $FG_DIM
-$LblFiles.Location  = New-Object System.Drawing.Point(90, 694)
+$LblFiles.Location  = New-Object System.Drawing.Point(90, 814)
 $LblFiles.Size      = New-Object System.Drawing.Size(160, 18)
 $Form.Controls.Add($LblFiles)
 
@@ -475,7 +505,7 @@ $LblSpeed = New-Object System.Windows.Forms.Label
 $LblSpeed.Text      = ""
 $LblSpeed.Font      = $FONT_SUB
 $LblSpeed.ForeColor = $FG_DIM
-$LblSpeed.Location  = New-Object System.Drawing.Point(280, 694)
+$LblSpeed.Location  = New-Object System.Drawing.Point(280, 814)
 $LblSpeed.Size      = New-Object System.Drawing.Size(120, 18)
 $Form.Controls.Add($LblSpeed)
 
@@ -483,7 +513,7 @@ $LblETA = New-Object System.Windows.Forms.Label
 $LblETA.Text      = ""
 $LblETA.Font      = $FONT_SUB
 $LblETA.ForeColor = $FG_DIM
-$LblETA.Location  = New-Object System.Drawing.Point(430, 694)
+$LblETA.Location  = New-Object System.Drawing.Point(430, 814)
 $LblETA.Size      = New-Object System.Drawing.Size(222, 18)
 $Form.Controls.Add($LblETA)
 
@@ -491,7 +521,7 @@ $LblCurrentFile = New-Object System.Windows.Forms.Label
 $LblCurrentFile.Text      = ""
 $LblCurrentFile.Font      = $FONT_SUB
 $LblCurrentFile.ForeColor = $FG_DIM
-$LblCurrentFile.Location  = New-Object System.Drawing.Point(24, 714)
+$LblCurrentFile.Location  = New-Object System.Drawing.Point(24, 834)
 $LblCurrentFile.Size      = New-Object System.Drawing.Size(628, 18)
 $Form.Controls.Add($LblCurrentFile)
 
@@ -503,7 +533,7 @@ $Form.Controls.Add($LblCurrentFile)
 $VDivider = New-Object System.Windows.Forms.Panel
 $VDivider.BackColor = $PANEL
 $VDivider.Location  = New-Object System.Drawing.Point(668, 86)
-$VDivider.Size      = New-Object System.Drawing.Size(1, 634)
+$VDivider.Size      = New-Object System.Drawing.Size(1, 754)
 $Form.Controls.Add($VDivider)
 
 $LblLogHeader = New-Object System.Windows.Forms.Label
@@ -518,7 +548,7 @@ $Form.Controls.Add($LblLogHeader)
 
 $TxtLog = New-Object System.Windows.Forms.RichTextBox
 $TxtLog.Location    = New-Object System.Drawing.Point(685, 110)
-$TxtLog.Size        = New-Object System.Drawing.Size(431, 610)
+$TxtLog.Size        = New-Object System.Drawing.Size(431, 730)
 $TxtLog.BackColor   = $PANEL
 $TxtLog.ForeColor   = $FG_DIM
 $TxtLog.Font        = $FONT_LOG
@@ -540,10 +570,13 @@ function AppendLog($msg, $color) {
 }
 
 function ResetUI {
-    $BtnRun.Enabled      = $true
-    $BtnStop.Enabled     = $false
-    $BtnRun.Text         = "START INGEST"
-    $BtnRun.BackColor    = $TEAL
+    $BtnDryRun.Enabled     = $true
+    $BtnLiveIngest.Enabled = $true
+    $BtnStop.Enabled       = $false
+    $BtnDryRun.Text        = "START DRY RUN"
+    $BtnLiveIngest.Text    = "START LIVE INGEST"
+    $BtnDryRun.BackColor   = $PANEL
+    $BtnLiveIngest.BackColor = $TEAL
     $LblSpeed.Text       = ""
     $LblETA.Text         = ""
     $LblCurrentFile.Text = ""
@@ -605,45 +638,75 @@ function BuildDestIndex($destPath) {
     if (Test-Path $destPath) {
         Get-ChildItem -Path $destPath -Recurse -File -ErrorAction SilentlyContinue | ForEach-Object {
             $key = $_.Name.ToLower()
-            if (-not $index.ContainsKey($key)) { $index[$key] = $_.FullName }
+            if (-not $index.ContainsKey($key)) { $index[$key] = @{ Length = $_.Length; Path = $_.FullName } }
         }
     }
     return $index
 }
 
+# A file only counts as a duplicate when the recycled filename AND size match -
+# Nikon bodies wrap the DSC_/file counter back to 0001 after ~9999 shots, so
+# unrelated files can share a name across shoots. Name+size is just a cheap
+# pre-filter though, so once both match we confirm with an MD5 checksum
+# against the actual vault file before calling it a true duplicate.
+function IsDuplicateInVault($destIndex, $key, $sourceLength, $sourcePath) {
+    if (-not $destIndex.ContainsKey($key)) { return $false }
+    $entry = $destIndex[$key]
+    if ($entry.Length -ne $sourceLength) { return $false }
+    if (-not $sourcePath -or -not (Test-Path $sourcePath) -or -not (Test-Path $entry.Path)) { return $false }
+    $srcHash  = (Get-FileHash -Path $sourcePath -Algorithm MD5).Hash
+    $destHash = (Get-FileHash -Path $entry.Path -Algorithm MD5).Hash
+    return $srcHash -eq $destHash
+}
+
 # -- EXIFTOOL RUNNER -----------------------------------------
 # $subFolder: optional subfolder appended after the date folder (e.g. "360")
-function RunExifStep($extensions, $sourceDir, $fileMap, $destIndex, $isDryRun, $dest, $subFolder = "") {
-    $extArgs  = ($extensions | ForEach-Object { "-ext $_" }) -join " "
+# $sourceFiles: pre-gathered FileInfo list for this step (e.g. $RawFiles)
+function RunExifStep($sourceFiles, $fileMap, $destIndex, $isDryRun, $dest, $subFolder = "") {
     $subPart  = if ($subFolder -ne "") { "\$subFolder" } else { "" }
     $destPattern = "$dest\%Y_%m\%Y_%m_%d$($script:Suffix)$subPart"
 
     if ($isDryRun) {
-        foreach ($ext in $extensions) {
-            $files = Get-ChildItem -Path $sourceDir -Recurse -Filter "*.$ext" -ErrorAction SilentlyContinue
-            foreach ($f in $files) {
-                if ($script:StopRequested) { return $false }
-                $key = $f.Name.ToLower()
-                if ($destIndex.ContainsKey($key)) {
-                    AppendLog ("  [SKIP - duplicate]  " + $f.Name) $ORANGE
-                } else {
-                    $subLabel = if ($subFolder -ne "") { " >> $subFolder" } else { "" }
-                    AppendLog ("  [WOULD COPY$subLabel]  " + $f.Name + "  (" + (FormatBytes $f.Length) + ")") $TEAL_DIM
-                }
-                $script:BytesDone += $f.Length
-                $script:FilesDone++
-                $pct = if ($script:TotalBytes -gt 0) { [int](($script:BytesDone / $script:TotalBytes) * 100) } else { 0 }
-                $ProgressBar.Value   = [Math]::Min($pct, 100)
-                $LblPct.Text         = "$([Math]::Min($pct,100))%"
-                $LblFiles.Text       = "$($script:FilesDone) / $($script:TotalFiles) files"
-                $LblCurrentFile.Text = "Simulating: $($f.Name)"
-                [System.Windows.Forms.Application]::DoEvents()
+        foreach ($f in $sourceFiles) {
+            if ($script:StopRequested) { return $false }
+            $key = $f.Name.ToLower()
+            if (IsDuplicateInVault $destIndex $key $f.Length $f.FullName) {
+                AppendLog ("  [SKIP - duplicate]  " + $f.Name) $ORANGE
+            } else {
+                $subLabel = if ($subFolder -ne "") { " >> $subFolder" } else { "" }
+                AppendLog ("  [WOULD COPY$subLabel]  " + $f.Name + "  (" + (FormatBytes $f.Length) + ")") $TEAL_DIM
             }
+            $script:BytesDone += $f.Length
+            $script:FilesDone++
+            $pct = if ($script:TotalBytes -gt 0) { [int](($script:BytesDone / $script:TotalBytes) * 100) } else { 0 }
+            $ProgressBar.Value   = [Math]::Min($pct, 100)
+            $LblPct.Text         = "$([Math]::Min($pct,100))%"
+            $LblFiles.Text       = "$($script:FilesDone) / $($script:TotalFiles) files"
+            $LblCurrentFile.Text = "Simulating: $($f.Name)"
+            [System.Windows.Forms.Application]::DoEvents()
         }
         return $true
     }
 
-    $argStr = "-r -d `"$destPattern`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" $extArgs -o `".`" --overwrite_original -progress `"$sourceDir`""
+    # Filter out true duplicates (name+size+checksum) BEFORE invoking ExifTool,
+    # so already-vaulted files are neither re-copied nor overwritten.
+    $toCopy = @()
+    foreach ($f in $sourceFiles) {
+        $key = $f.Name.ToLower()
+        if (IsDuplicateInVault $destIndex $key $f.Length $f.FullName) {
+            AppendLog ("  [DUPLICATE - already in vault]  " + $f.Name) $ORANGE
+            $script:BytesDone += $f.Length
+            $script:FilesDone++
+        } else {
+            $toCopy += $f
+        }
+    }
+    if ($toCopy.Count -eq 0) { return $true }
+
+    $argFile = [System.IO.Path]::GetTempFileName()
+    Set-Content -Path $argFile -Value ($toCopy | ForEach-Object { $_.FullName }) -Encoding UTF8
+
+    $argStr = "-@ `"$argFile`" -d `"$destPattern`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" -o `".`" --overwrite_original -progress"
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName               = $ExifBox.TextBox.Text.Trim()
@@ -665,29 +728,24 @@ function RunExifStep($extensions, $sourceDir, $fileMap, $destIndex, $isDryRun, $
                 $filePath = $Matches[1].Trim()
                 $fileName = [System.IO.Path]::GetFileName($filePath)
                 $baseName = [System.IO.Path]::GetFileNameWithoutExtension($filePath).ToLower()
-                $fileKey  = $fileName.ToLower()
                 $fileSize = 0
                 if ($fileMap.ContainsKey($baseName)) { $fileSize = $fileMap[$baseName].Length }
-                if ($destIndex.ContainsKey($fileKey)) {
-                    AppendLog ("  [DUPLICATE - already in vault]  $fileName") $ORANGE
-                } else {
-                    $script:BytesDone += $fileSize
-                    $script:FilesDone++
-                    $pct = if ($script:TotalBytes -gt 0) { [int](($script:BytesDone / $script:TotalBytes) * 100) } else { 0 }
-                    $ProgressBar.Value   = [Math]::Min($pct, 100)
-                    $LblPct.Text         = "$([Math]::Min($pct,100))%"
-                    $LblFiles.Text       = "$($script:FilesDone) / $($script:TotalFiles) files"
-                    $elapsed = ([DateTime]::Now - $script:IngestStart).TotalSeconds
-                    if ($elapsed -gt 1 -and $script:BytesDone -gt 0) {
-                        $speed     = $script:BytesDone / $elapsed
-                        $remaining = $script:TotalBytes - $script:BytesDone
-                        $etaSecs   = if ($speed -gt 0) { $remaining / $speed } else { 0 }
-                        $LblSpeed.Text = FormatSpeed $speed
-                        $LblETA.Text   = "ETA  " + (FormatETA $etaSecs)
-                    }
-                    $LblCurrentFile.Text = "Copying: $fileName  (" + (FormatBytes $fileSize) + ")"
-                    AppendLog ("  [" + (FormatBytes $script:BytesDone) + " / " + (FormatBytes $script:TotalBytes) + "]  $fileName") $FG_DIM
+                $script:BytesDone += $fileSize
+                $script:FilesDone++
+                $pct = if ($script:TotalBytes -gt 0) { [int](($script:BytesDone / $script:TotalBytes) * 100) } else { 0 }
+                $ProgressBar.Value   = [Math]::Min($pct, 100)
+                $LblPct.Text         = "$([Math]::Min($pct,100))%"
+                $LblFiles.Text       = "$($script:FilesDone) / $($script:TotalFiles) files"
+                $elapsed = ([DateTime]::Now - $script:IngestStart).TotalSeconds
+                if ($elapsed -gt 1 -and $script:BytesDone -gt 0) {
+                    $speed     = $script:BytesDone / $elapsed
+                    $remaining = $script:TotalBytes - $script:BytesDone
+                    $etaSecs   = if ($speed -gt 0) { $remaining / $speed } else { 0 }
+                    $LblSpeed.Text = FormatSpeed $speed
+                    $LblETA.Text   = "ETA  " + (FormatETA $etaSecs)
                 }
+                $LblCurrentFile.Text = "Copying: $fileName  (" + (FormatBytes $fileSize) + ")"
+                AppendLog ("  [" + (FormatBytes $script:BytesDone) + " / " + (FormatBytes $script:TotalBytes) + "]  $fileName") $FG_DIM
             } elseif ($trimmed -match "\d+ image files") {
                 AppendLog "  $trimmed" $GREEN
             } elseif ($trimmed -match "^(Error|Warning)") {
@@ -697,12 +755,14 @@ function RunExifStep($extensions, $sourceDir, $fileMap, $destIndex, $isDryRun, $
         [System.Windows.Forms.Application]::DoEvents()
         if ($script:StopRequested) {
             try { $script:CurrentProcess.Kill() } catch {}
+            Remove-Item -Path $argFile -Force -ErrorAction SilentlyContinue
             return $false
         }
     }
     $errText = $script:CurrentProcess.StandardError.ReadToEnd()
     if ($errText.Trim() -ne "") { AppendLog "  $errText" $FG_DIM }
     $script:CurrentProcess.WaitForExit()
+    Remove-Item -Path $argFile -Force -ErrorAction SilentlyContinue
     return (-not $script:StopRequested)
 }
 
@@ -732,15 +792,22 @@ function VerifyIngest($sourceFiles, $destPath, $isDryRun) {
 }
 
 # ============================================================
-#  RUN BUTTON
+#  RUN BUTTONS
 # ============================================================
-$BtnRun.Add_Click({
+function StartIngest($IsDryRun) {
     $TxtLog.Clear()
-    $script:StopRequested = $false
-    $BtnRun.Enabled       = $false
-    $BtnStop.Enabled      = $true
-    $BtnRun.Text          = "RUNNING..."
-    $BtnRun.BackColor     = $TEAL_DIM
+    $script:StopRequested  = $false
+    $BtnDryRun.Enabled     = $false
+    $BtnLiveIngest.Enabled = $false
+    $BtnStop.Enabled       = $true
+    $DryRunBanner.Visible  = $IsDryRun
+    if ($IsDryRun) {
+        $BtnDryRun.Text      = "RUNNING..."
+        $BtnDryRun.BackColor = $TEAL_DIM
+    } else {
+        $BtnLiveIngest.Text      = "RUNNING..."
+        $BtnLiveIngest.BackColor = $TEAL_DIM
+    }
     $LblStatus.ForeColor  = $YELLOW
     $ProgressBar.Value    = 0
     $LblPct.Text          = "0%"
@@ -752,7 +819,6 @@ $BtnRun.Add_Click({
     $DEST_LIVE     = $DestBox.TextBox.Text.Trim()
     $LOG_DIR_LIVE  = $LogBox.TextBox.Text.Trim()
     $EXIFTOOL_LIVE = $ExifBox.TextBox.Text.Trim()
-    $IsDryRun      = $script:DryRunChecked
 
     if ($DEST_LIVE -eq "") {
         AppendLog "[ERROR] Vault destination path is empty." $RED; ResetUI; return
@@ -771,6 +837,16 @@ $BtnRun.Add_Click({
     if ($EvtVal -ne "") { $script:Suffix += " $EvtVal" }
     if ($LocVal -ne "") { $script:Suffix += " $LocVal" }
 
+    $RawExtList   = ParseExtList $TxtRawExt.Text.Trim()
+    $VideoExtList = ParseExtList $TxtVideoExt.Text.Trim()
+    $AuxRaw       = if ($TxtAuxExt.Text -eq $TxtAuxExt.Tag) { "" } else { $TxtAuxExt.Text.Trim() }
+    $AuxExtList   = ParseExtList $AuxRaw
+
+    if ($RawExtList.Count -eq 0) {
+        AppendLog "[ERROR] No RAW extensions configured. Set at least one under FILE TYPES (e.g. nef, cr2, arw)." $RED
+        ResetUI; return
+    }
+
     $DriveLetter = $CmbDrive.SelectedItem.ToString()
     $SD_CARD     = $DriveLetter + "DCIM"
 
@@ -784,33 +860,34 @@ $BtnRun.Add_Click({
     AppendLog "[INFO]  Scanning source files..." $YELLOW
     [System.Windows.Forms.Application]::DoEvents()
 
-    $NefFiles  = @(Get-ChildItem -Path $SD_CARD -Recurse -Filter "*.nef"  -ErrorAction SilentlyContinue)
-    $Mp4Files  = @(Get-ChildItem -Path $SD_CARD -Recurse -Filter "*.mp4"  -ErrorAction SilentlyContinue)
-    $LrvFiles  = @(Get-ChildItem -Path $SD_CARD -Recurse -Filter "*.lrv"  -ErrorAction SilentlyContinue)
-    $InsvFiles = @(Get-ChildItem -Path $SD_CARD -Recurse -Filter "*.insv" -ErrorAction SilentlyContinue)
-    $JpgFiles  = @(Get-ChildItem -Path $SD_CARD -Recurse -Include "*.jpg","*.jpeg" -ErrorAction SilentlyContinue)
+    $RawFiles   = GetFilesByExt $SD_CARD $RawExtList
+    $VideoFiles = GetFilesByExt $SD_CARD $VideoExtList
+    $AuxFiles   = GetFilesByExt $SD_CARD $AuxExtList
+    $JpgFiles   = @(Get-ChildItem -Path $SD_CARD -Recurse -Include "*.jpg","*.jpeg" -ErrorAction SilentlyContinue)
 
     $FileMap = @{}
-    foreach ($f in ($NefFiles + $Mp4Files + $LrvFiles + $InsvFiles + $JpgFiles)) {
+    foreach ($f in ($RawFiles + $VideoFiles + $AuxFiles + $JpgFiles)) {
         $key = [System.IO.Path]::GetFileNameWithoutExtension($f.Name).ToLower()
         if (-not $FileMap.ContainsKey($key)) { $FileMap[$key] = $f }
     }
 
-    $TotalNefBytes  = ($NefFiles  | Measure-Object -Property Length -Sum).Sum
-    $TotalMp4Bytes  = ($Mp4Files  | Measure-Object -Property Length -Sum).Sum
-    $Total360Bytes  = (($LrvFiles + $InsvFiles) | Measure-Object -Property Length -Sum).Sum
-    if (-not $TotalNefBytes)  { $TotalNefBytes  = 0 }
-    if (-not $TotalMp4Bytes)  { $TotalMp4Bytes  = 0 }
-    if (-not $Total360Bytes)  { $Total360Bytes  = 0 }
-    $TotalTransferBytes = $TotalNefBytes + $TotalMp4Bytes + $Total360Bytes
-    $script:TotalFiles  = $NefFiles.Count + $Mp4Files.Count + $LrvFiles.Count + $InsvFiles.Count
+    $TotalRawBytes   = ($RawFiles   | Measure-Object -Property Length -Sum).Sum
+    $TotalVideoBytes = ($VideoFiles | Measure-Object -Property Length -Sum).Sum
+    $TotalAuxBytes   = ($AuxFiles   | Measure-Object -Property Length -Sum).Sum
+    if (-not $TotalRawBytes)   { $TotalRawBytes   = 0 }
+    if (-not $TotalVideoBytes) { $TotalVideoBytes = 0 }
+    if (-not $TotalAuxBytes)   { $TotalAuxBytes   = 0 }
+    $TotalTransferBytes = $TotalRawBytes + $TotalVideoBytes + $TotalAuxBytes
+    $script:TotalFiles  = $RawFiles.Count + $VideoFiles.Count + $AuxFiles.Count
     $script:TotalBytes  = $TotalTransferBytes
     $script:FilesDone   = 0
     $script:BytesDone   = 0
 
-    AppendLog "[INFO]  Found $($NefFiles.Count) NEFs   ($(FormatBytes $TotalNefBytes))" $FG
-    AppendLog "[INFO]  Found $($Mp4Files.Count) MP4s   ($(FormatBytes $TotalMp4Bytes))" $FG
-    AppendLog "[INFO]  Found $($LrvFiles.Count + $InsvFiles.Count) 360 files (.lrv/.insv)  ($(FormatBytes $Total360Bytes))" $FG
+    AppendLog "[INFO]  Found $($RawFiles.Count) RAW files   ($(FormatBytes $TotalRawBytes))" $FG
+    AppendLog "[INFO]  Found $($VideoFiles.Count) video files   ($(FormatBytes $TotalVideoBytes))" $FG
+    if ($AuxExtList.Count -gt 0) {
+        AppendLog "[INFO]  Found $($AuxFiles.Count) aux files ($($AuxExtList -join '/'))  ($(FormatBytes $TotalAuxBytes))" $FG
+    }
     AppendLog "[INFO]  Total: $(FormatBytes $TotalTransferBytes)" $FG
 
     $LblStatus.Text = "Building duplicate index..."
@@ -819,8 +896,8 @@ $BtnRun.Add_Click({
     $DestIndex = BuildDestIndex $DEST_LIVE
     AppendLog "[INFO]  Vault index: $($DestIndex.Count) existing files." $FG
     $dupCount = 0
-    foreach ($f in ($NefFiles + $Mp4Files)) {
-        if ($DestIndex.ContainsKey($f.Name.ToLower())) { $dupCount++ }
+    foreach ($f in ($RawFiles + $VideoFiles)) {
+        if (IsDuplicateInVault $DestIndex $f.Name.ToLower() $f.Length $f.FullName) { $dupCount++ }
     }
     if ($dupCount -gt 0) {
         AppendLog "[WARN]  $dupCount file(s) already in vault - will be skipped." $ORANGE
@@ -870,9 +947,9 @@ $BtnRun.Add_Click({
     AppendLog "============================================" $TEAL
 
     foreach ($step in @(
-        @{ Label="NEFs"; Exts=@("nef"); Files=$NefFiles; Bytes=$TotalNefBytes; Sub="" },
-        @{ Label="MP4s"; Exts=@("mp4"); Files=$Mp4Files; Bytes=$TotalMp4Bytes; Sub="" },
-        @{ Label="360 files (.lrv/.insv)"; Exts=@("lrv","insv"); Files=($LrvFiles+$InsvFiles); Bytes=$Total360Bytes; Sub="360" }
+        @{ Label="RAW files"; Files=$RawFiles; Bytes=$TotalRawBytes; Sub="" },
+        @{ Label="video files"; Files=$VideoFiles; Bytes=$TotalVideoBytes; Sub="" },
+        @{ Label="aux files"; Files=$AuxFiles; Bytes=$TotalAuxBytes; Sub="aux" }
     )) {
         if ($step.Files.Count -eq 0) {
             AppendLog "`n[INFO]  No $($step.Label) found - skipping." $FG_DIM
@@ -880,7 +957,7 @@ $BtnRun.Add_Click({
         }
         $LblStatus.Text = "Copying $($step.Label)..."
         AppendLog "`n[INFO]  Copying $($step.Files.Count) $($step.Label) ($(FormatBytes $step.Bytes))..." $YELLOW
-        $ok = RunExifStep $step.Exts $SD_CARD $FileMap $DestIndex $IsDryRun $DEST_LIVE $step.Sub
+        $ok = RunExifStep $step.Files $FileMap $DestIndex $IsDryRun $DEST_LIVE $step.Sub
         if (-not $ok) { ResetUI; return }
         AppendLog "[OK]    $($step.Label) step complete." $GREEN
     }
@@ -891,13 +968,13 @@ $BtnRun.Add_Click({
     foreach ($Jpg in $JpgFiles) {
         if ($script:StopRequested) { ResetUI; return }
         $BaseName = [System.IO.Path]::GetFileNameWithoutExtension($Jpg.Name)
-        $NefMatch = $NefFiles | Where-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) -eq $BaseName } | Select-Object -First 1
-        if (-not $NefMatch) {
+        $RawMatch = $RawFiles | Where-Object { [System.IO.Path]::GetFileNameWithoutExtension($_.Name) -eq $BaseName } | Select-Object -First 1
+        if (-not $RawMatch) {
             $fileKey = $Jpg.Name.ToLower()
-            if ($DestIndex.ContainsKey($fileKey)) {
+            if (IsDuplicateInVault $DestIndex $fileKey $Jpg.Length $Jpg.FullName) {
                 AppendLog "[SKIP]  Orphan JPG already in vault: $($Jpg.Name)" $ORANGE
             } else {
-                AppendLog "[WARN]  Orphan JPG (no NEF): $($Jpg.Name)" $YELLOW
+                AppendLog "[WARN]  Orphan JPG (no matching RAW file): $($Jpg.Name)" $YELLOW
                 if (-not $IsDryRun) {
                     $argStr = "-d `"$DEST_LIVE\%Y_%m\%Y_%m_%d$($script:Suffix)`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" -o `".`" --overwrite_original `"$($Jpg.FullName)`""
                     $psi2 = New-Object System.Diagnostics.ProcessStartInfo
@@ -916,16 +993,7 @@ $BtnRun.Add_Click({
     $LblPct.Text         = "100%"
     $LblCurrentFile.Text = ""
     $LblStatus.Text      = "Verifying..."
-    VerifyIngest ($NefFiles + $Mp4Files + $LrvFiles + $InsvFiles) $DEST_LIVE $IsDryRun
-
-    AppendLog "`n[INFO]  Output folders:" $YELLOW
-    Get-ChildItem -Path $DEST_LIVE -Recurse -Directory -ErrorAction SilentlyContinue | Sort-Object FullName | ForEach-Object {
-        $fc = (Get-ChildItem -Path $_.FullName -File -ErrorAction SilentlyContinue).Count
-        if ($fc -gt 0) {
-            $rel = $_.FullName.Replace($DEST_LIVE, "").TrimStart("\")
-            AppendLog "  $fc files  >>  $rel" $FG
-        }
-    }
+    VerifyIngest ($RawFiles + $VideoFiles + $AuxFiles) $DEST_LIVE $IsDryRun
 
     $elapsed    = [DateTime]::Now - $script:IngestStart
     $elapsedStr = "{0}m {1}s" -f [int]$elapsed.TotalMinutes, $elapsed.Seconds
@@ -933,9 +1001,9 @@ $BtnRun.Add_Click({
 
     AppendLog "`n-- SUMMARY ---------------------" $TEAL
     AppendLog "  Mode        : $modeLabel" $(if ($IsDryRun) { $YELLOW } else { $GREEN })
-    AppendLog "  NEFs        : $($NefFiles.Count)  ($(FormatBytes $TotalNefBytes))" $FG
-    AppendLog "  MP4s        : $($Mp4Files.Count)  ($(FormatBytes $TotalMp4Bytes))" $FG
-    AppendLog "  360 files   : $($LrvFiles.Count + $InsvFiles.Count)  ($(FormatBytes $Total360Bytes))" $FG
+    AppendLog "  RAW files   : $($RawFiles.Count)  ($(FormatBytes $TotalRawBytes))" $FG
+    AppendLog "  Video files : $($VideoFiles.Count)  ($(FormatBytes $TotalVideoBytes))" $FG
+    AppendLog "  Aux files   : $($AuxFiles.Count)  ($(FormatBytes $TotalAuxBytes))" $FG
     AppendLog "  Duplicates  : $dupCount skipped" $(if ($dupCount -gt 0) { $ORANGE } else { $FG })
     AppendLog "  Orphan JPGs : $OrphanCount" $FG
     AppendLog "  Total size  : $(FormatBytes $TotalTransferBytes)" $FG
@@ -967,7 +1035,10 @@ $BtnRun.Add_Click({
     ResetUI
     $LblStatus.Text      = $finalMsg
     $LblStatus.ForeColor = $GREEN
-})
+}
+
+$BtnDryRun.Add_Click({ StartIngest $true })
+$BtnLiveIngest.Add_Click({ StartIngest $false })
 
 try {
     [System.Windows.Forms.Application]::Run($Form)

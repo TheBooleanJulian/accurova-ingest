@@ -4,7 +4,7 @@
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
 
-![Version](https://img.shields.io/badge/version-1.0.0-00D4C8)
+![Version](https://img.shields.io/badge/version-1.1.0-00D4C8)
 ![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
 
@@ -14,20 +14,22 @@
 
 ## What it does
 
-Accurova Ingest is a Windows PowerShell GUI utility for photographers shooting with a Nikon D850 (and 360 cameras). It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts NEFs, MP4s, and 360 footage into a structured vault (`Dest\YYYY_MM\YYYY_MM_DD [Event] [Location]\`) — skipping duplicates, flagging orphan JPGs, and verifying the copy before you format the card. Config is persisted to a local JSON file so your vault path, log folder, and ExifTool location are remembered between runs.
+Accurova Ingest is a Windows PowerShell GUI utility for photographers and videographers. It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts your RAW, video, and auxiliary/proxy footage into a structured vault (`Dest\YYYY_MM\YYYY_MM_DD [Event] [Location]\`) — skipping duplicates, flagging orphan JPGs, and verifying the copy before you format the card. It's camera-agnostic: tell it your RAW/video/aux file extensions once (Canon CR2/CR3, Sony ARW, Fujifilm RAF, GoPro/Insta360 LRV/INSV, etc.) and it works the same as it does for a Nikon NEF shooter. Config is persisted to a local JSON file so your vault path, log folder, ExifTool location, and file types are remembered between runs.
 
 ## Features
 
 - Auto-detects SD card by looking for a `DCIM` folder on removable drives
-- Sorts NEFs, MP4s, and 360 footage (`.lrv` / `.insv`) into dated vault folders using EXIF capture date
-- Duplicate detection against the existing vault before copying
-- Orphan JPG detection (JPGs with no matching NEF)
+- Camera-agnostic file typing — configure your own RAW / video / auxiliary (proxy, 360 footage, etc.) extensions instead of a hardcoded list
+- Sorts matched files into dated vault folders using EXIF capture date
+- Duplicate detection against the existing vault before copying, confirmed by checksum (not just filename/size) so recycled camera file-counters don't produce false positives
+- Orphan JPG detection (JPGs with no matching RAW file)
 - Dry run mode — full simulation with no files copied
 - Live progress: percentage, speed, ETA, and current file
 - Pre-flight storage space check with continue/cancel dialog
 - Post-ingest verification (source vs. destination file and byte counts)
 - Optional SD card eject on completion
-- Persisted config (`accurova_config.json`) for vault path, log folder, and ExifTool path
+- Optional auto-launch on SD card insertion (Task Scheduler event trigger — see `accurova_register_autolaunch.ps1`)
+- Persisted config (`accurova_config.json`) for vault path, log folder, ExifTool path, and file extensions
 
 ## Tech Stack
 
@@ -40,11 +42,16 @@ Accurova Ingest is a Windows PowerShell GUI utility for photographers shooting w
 
 1. Copy `accurova_config.example.json` to `accurova_config.json` in the same folder as the script and adjust the paths, or set them from the UI after launching.
 2. Run `accurova_ingest.ps1`.
-3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths, then click **Save Paths**.
-4. Optionally enter an **Event Name** / **Location** — appended to each day's folder name.
-5. Confirm the detected **SD Card Drive** (or pick manually).
-6. Toggle **Dry run** to preview without copying, and/or **Eject SD card after ingest**.
-7. Click **START INGEST**.
+3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths (e.g. `D:\Photos\Vault`, `D:\Photos\Vault\_logs`, `C:\exiftool\exiftool.exe`), then click **Save Paths**.
+4. Under **File Types**, set your camera's extensions — e.g. **RAW**: `nef` (Nikon), `cr2, cr3` (Canon), `arw` (Sony), `raf` (Fujifilm); **Video**: `mp4, mov`; **Aux** (optional): `lrv, insv` for GoPro/Insta360 proxy or 360 footage.
+5. Optionally enter an **Event Name** / **Location** — appended to each day's folder name.
+6. Confirm the detected **SD Card Drive** (or pick manually).
+7. Toggle **Dry run** to preview without copying, and/or **Eject SD card after ingest**.
+8. Click **START INGEST**.
+
+### Optional: auto-launch on SD card insert
+
+Run `accurova_register_autolaunch.ps1` once from an elevated (Administrator) PowerShell. It registers a Scheduled Task that fires `accurova_autolaunch.ps1` whenever Windows detects a new device; that script checks for a DCIM-bearing removable drive and pops the GUI up automatically if one is found (no-ops otherwise, and no-ops if the app is already running).
 
 ## Requirements
 
@@ -55,9 +62,12 @@ Accurova Ingest is a Windows PowerShell GUI utility for photographers shooting w
 
 | Field | Required | Description |
 |---|---|---|
-| `Dest` | Yes | Root path of your photo vault |
-| `LogDir` | Yes | Where ingest logs are written |
-| `Exiftool` | Yes | Full path to the ExifTool executable |
+| `Dest` | Yes | Root path of your photo vault, e.g. `D:\Photos\Vault` |
+| `LogDir` | Yes | Where ingest logs are written, e.g. `D:\Photos\Vault\_logs` |
+| `Exiftool` | Yes | Full path to the ExifTool executable, e.g. `C:\exiftool\exiftool.exe` |
+| `RawExt` | Yes | Comma-separated RAW extensions, no dots, e.g. `nef, cr2, cr3, arw, raf, orf, rw2, dng` |
+| `VideoExt` | Yes | Comma-separated video extensions, e.g. `mp4, mov` |
+| `AuxExt` | No | Comma-separated proxy/360 extensions, e.g. `lrv, insv` — leave blank to skip this category |
 
 Config is stored in `accurova_config.json` next to the script. Copy `accurova_config.example.json` to get started.
 
@@ -66,6 +76,8 @@ Config is stored in `accurova_config.json` next to the script. Copy `accurova_co
 ```
 accurova-ingest/
 |-- accurova_ingest.ps1
+|-- accurova_autolaunch.ps1
+|-- accurova_register_autolaunch.ps1
 |-- accurova_config.example.json
 |-- LICENSE
 |-- COMMERCIAL-LICENSE.md
@@ -84,23 +96,28 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 
 **Done**
 
-- [x] EXIF-based date sorting for NEF, MP4, LRV, and INSV files
-- [x] Duplicate detection and orphan JPG flagging
+- [x] EXIF-based date sorting for configurable RAW, video, and auxiliary (proxy/360) file types
+- [x] Camera-agnostic file typing — no longer hardcoded to a single body's extensions
+- [x] Duplicate detection (name + size + checksum) and orphan JPG flagging
 - [x] Dry run mode and live progress reporting
 - [x] Post-ingest verification and optional SD card eject
 - [x] Persisted JSON config with in-UI editing
 - [x] Two-column WinForms layout with live output log
-- [x] 360 footage ingested into a `360` subfolder per day
+- [x] Optional auto-launch on SD card insertion via Task Scheduler
 
 **Planned / Suggestions**
 
 - **Config profiles** — support multiple named destination/camera profiles (e.g. different bodies, different vault drives) instead of a single global config
-- **Additional camera support** — generalize the file-type/extension list beyond D850 (NEF/MP4/LRV/INSV) so other bodies can be ingested without editing the script
-- **Checksum verification** — optional hash-based verification pass instead of (or in addition to) filename/size matching, for stronger integrity guarantees before formatting the card
 - **Resume/retry on interruption** — recover cleanly from a killed process or dropped SD card mid-ingest instead of requiring a full re-run
 - **Structured logging** — write machine-readable (JSON/CSV) ingest logs alongside the human-readable log for easier auditing over time
 - **Packaging** — distribute as a signed `.exe` (e.g. via ps2exe) so it can run without an explicit PowerShell execution policy change
 - **Cross-platform ingest core** — split the ingest/verify logic from the WinForms UI so a CLI-only mode is possible on non-Windows setups running PowerShell Core
+- **CI parse-check** — a lightweight GitHub Actions workflow that runs PowerShell's AST parser against `accurova_ingest.ps1` on every push/PR, catching syntax errors before they reach a user's machine
+- **Mirrored/dual-destination ingest** — copy to a second vault path (e.g. a backup drive) in the same pass, for photographers who want on-site redundancy before formatting the card
+- **Toast notification on completion** — a Windows notification when ingest finishes, most useful once auto-launch is running unattended in the background and nobody's watching the log
+- **Config schema versioning** — an internal `ConfigVersion` field so future config-shape changes (like this release's new `RawExt`/`VideoExt`/`AuxExt` fields) can auto-migrate old files instead of silently falling back to defaults
+- **Adjustable duplicate-check strictness** — an option to skip the MD5 checksum pass and trust name+size alone, for users ingesting very large cards where per-file hashing adds noticeable time
+- **Customizable vault folder pattern** — the `YYYY_MM\YYYY_MM_DD [Event] [Location]` structure is currently fixed; a configurable date/folder template would suit different organizational preferences
 - No `.env.example` equivalent is provided for the PowerShell config path defaults — a setup script or first-run wizard could reduce manual config steps
 - No automated tests for ingest logic (duplicate detection, path construction, verification counts)
 
@@ -109,6 +126,16 @@ Suggestions and feedback welcome — open an issue or reach out directly.
 ## Changelog
 
 All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
+
+### [1.1.0] - 2026-08-04
+- Camera-agnostic file typing — replaced the hardcoded NEF/MP4/LRV/INSV extension list with a **FILE TYPES** UI section (RAW / Video / Aux, comma-separated, persisted to config); works for any camera, not just the D850
+- Note: the auxiliary-file subfolder is now named `aux` instead of `360`, since aux files aren't always 360 footage — existing vault folders are unaffected, new ingests will create `aux` going forward
+- Duplicate detection now confirms name+size matches with an MD5 checksum before treating a file as a true duplicate, so a camera's recycled file counter (e.g. wrapping back to `0001` after ~9999 shots) can't cause a false-positive skip
+- Live (non-dry-run) ingest now actually skips confirmed duplicates before invoking ExifTool, instead of copying/overwriting them anyway while only mislabeling the log
+- Optional auto-launch on SD card insertion — `accurova_register_autolaunch.ps1` registers a Task Scheduler event trigger that runs `accurova_autolaunch.ps1`, which pops the GUI up automatically when a DCIM-bearing drive appears
+- Fixed a crash ("cannot call a method on a null-valued expression") that could occur ~2 seconds after clicking **Save Paths**, caused by a WinForms Timer closure referencing an out-of-scope variable
+- Removed the verbose "Output folders" listing from the end-of-run log
+- Rebranded away from Nikon D850-specific naming for public release
 
 ### [1.0.0] - 2026-07-25
 - First tracked release of the public repo (git-backed versioning starts here); code already includes everything through 0.8.0 below
