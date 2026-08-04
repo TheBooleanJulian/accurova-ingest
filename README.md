@@ -4,7 +4,7 @@
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
 
-![Version](https://img.shields.io/badge/version-1.1.0-00D4C8)
+![Version](https://img.shields.io/badge/version-2.0.0-00D4C8)
 ![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
 
@@ -14,13 +14,32 @@
 
 ## What it does
 
-Accurova Ingest is a Windows PowerShell GUI utility for photographers and videographers. It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts your RAW, video, and auxiliary/proxy footage into a structured vault (`Dest\YYYY_MM\YYYY_MM_DD [Event] [Location]\`) — skipping duplicates, flagging orphan JPGs, and verifying the copy before you format the card. It's camera-agnostic: tell it your RAW/video/aux file extensions once (Canon CR2/CR3, Sony ARW, Fujifilm RAF, GoPro/Insta360 LRV/INSV, etc.) and it works the same as it does for a Nikon NEF shooter. Config is persisted to a local JSON file so your vault path, log folder, ExifTool location, and file types are remembered between runs.
+Accurova Ingest is a Windows PowerShell GUI utility for photographers and videographers. It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts your RAW, video, and auxiliary/proxy footage into a structured client vault — skipping duplicates, flagging orphan JPGs, embedding your copyright/contact metadata, and verifying the copy before you format the card. It's camera-agnostic: tell it your RAW/video/aux file extensions once (Canon CR2/CR3, Sony ARW, Fujifilm RAF, GoPro/Insta360 LRV/INSV, etc.) and it works the same as it does for a Nikon NEF shooter. Config is persisted to a local JSON file so your vault path, log folder, ExifTool location, file types, and metadata defaults are remembered between runs.
+
+Each ingest creates a full client-ready folder structure:
+
+```
+Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
+  |-- 01_RAW           <- ingested RAW/video/aux files land here (aux nests in 01_RAW\aux)
+  |-- 02_Catalog
+  |-- 03_Selects
+  |-- 04_Photoshop
+  |-- 05_Exports
+  |-- 06_Social
+  |-- 07_Prints
+  |-- 08_Contracts
+  |-- 09_Deliverables
+  `-- 10_Archive
+```
 
 ## Features
 
 - Auto-detects SD card by looking for a `DCIM` folder on removable drives
 - Camera-agnostic file typing — configure your own RAW / video / auxiliary (proxy, 360 footage, etc.) extensions instead of a hardcoded list
-- Sorts matched files into dated vault folders using EXIF capture date
+- Creates the full 10-folder client structure (`01_RAW` … `10_Archive`) under every day folder touched by the ingest, not just where files land
+- Client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName`) enforced automatically instead of typed free-text per shoot
+- Embeds Copyright, Credit (website), Source (contact), and job-type keywords into every ingested file via ExifTool — set once in **Metadata**, applied every run
+- Job Type dropdown (Wedding / Corporate / Event / Portrait / Other) layers extra keywords on top of your base metadata
 - Duplicate detection against the existing vault before copying, confirmed by checksum (not just filename/size) so recycled camera file-counters don't produce false positives
 - Orphan JPG detection (JPGs with no matching RAW file)
 - Dry run mode — full simulation with no files copied
@@ -28,8 +47,9 @@ Accurova Ingest is a Windows PowerShell GUI utility for photographers and videog
 - Pre-flight storage space check with continue/cancel dialog
 - Post-ingest verification (source vs. destination file and byte counts)
 - Optional SD card eject on completion
+- Optional Telegram notification on ingest completion (job name, file count, size, duration) — set a bot token + chat ID in **Metadata / Notifications**, leave blank to skip
 - Optional auto-launch on SD card insertion (Task Scheduler event trigger — see `accurova_register_autolaunch.ps1`)
-- Persisted config (`accurova_config.json`) for vault path, log folder, ExifTool path, and file extensions
+- Persisted config (`accurova_config.json`) for vault path, log folder, ExifTool path, file extensions, and metadata/notification defaults
 
 ## Tech Stack
 
@@ -44,10 +64,11 @@ Accurova Ingest is a Windows PowerShell GUI utility for photographers and videog
 2. Run `accurova_ingest.ps1`.
 3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths (e.g. `D:\Photos\Vault`, `D:\Photos\Vault\_logs`, `C:\exiftool\exiftool.exe`), then click **Save Paths**.
 4. Under **File Types**, set your camera's extensions — e.g. **RAW**: `nef` (Nikon), `cr2, cr3` (Canon), `arw` (Sony), `raf` (Fujifilm); **Video**: `mp4, mov`; **Aux** (optional): `lrv, insv` for GoPro/Insta360 proxy or 360 footage.
-5. Optionally enter an **Event Name** / **Location** — appended to each day's folder name.
-6. Confirm the detected **SD Card Drive** (or pick manually).
-7. Toggle **Dry run** to preview without copying, and/or **Eject SD card after ingest**.
-8. Click **START INGEST**.
+5. Under **Metadata / Notifications**, set your **Copyright**, **Contact Email**, and **Website** — written into every ingested file's metadata. Optionally add a **Telegram Bot Token** and **Chat ID** to get a message when ingest finishes.
+6. Enter a **Client Name** and pick a **Job Type**; optionally an **Event Name** too — these build the day folder's name (`YYYY-MM-DD_ClientName_EventName`) and select which extra keywords get embedded.
+7. Confirm the detected **SD Card Drive** (or pick manually).
+8. Toggle **Eject SD card after ingest** if wanted.
+9. Click **START DRY RUN** to preview without copying, or **START LIVE INGEST** to actually copy.
 
 ### Optional: auto-launch on SD card insert
 
@@ -57,6 +78,7 @@ Run `accurova_register_autolaunch.ps1` once from an elevated (Administrator) Pow
 
 - Windows with PowerShell
 - [ExifTool](https://exiftool.org/) installed and its path set in config or the UI
+- Internet access, only if using the optional Telegram completion notification
 
 ## Configuration
 
@@ -68,8 +90,15 @@ Run `accurova_register_autolaunch.ps1` once from an elevated (Administrator) Pow
 | `RawExt` | Yes | Comma-separated RAW extensions, no dots, e.g. `nef, cr2, cr3, arw, raf, orf, rw2, dng` |
 | `VideoExt` | Yes | Comma-separated video extensions, e.g. `mp4, mov` |
 | `AuxExt` | No | Comma-separated proxy/360 extensions, e.g. `lrv, insv` — leave blank to skip this category |
+| `Copyright` | No | Written to the ExifTool `Copyright` tag on every ingested file, e.g. `(c) 2026 Jane Doe` |
+| `ContactEmail` | No | Written to the ExifTool `Source` tag |
+| `Website` | No | Written to the ExifTool `Credit` tag |
+| `TelegramToken` | No | Telegram bot token for the completion notification — leave blank to disable |
+| `TelegramChatId` | No | Telegram chat ID to notify — leave blank to disable |
 
 Config is stored in `accurova_config.json` next to the script. Copy `accurova_config.example.json` to get started.
+
+Job Type and its keyword presets (Wedding/Corporate/Event/Portrait/Other) aren't persisted per-job — they're picked fresh each ingest from the dropdown. To change what keywords each job type embeds, edit the `$JobTypeKeywords` hashtable near the top of `accurova_ingest.ps1`.
 
 ## Project Structure
 
@@ -104,6 +133,10 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 - [x] Persisted JSON config with in-UI editing
 - [x] Two-column WinForms layout with live output log
 - [x] Optional auto-launch on SD card insertion via Task Scheduler
+- [x] Client folder scaffold (`01_RAW`…`10_Archive`) created automatically under every day folder
+- [x] Enforced client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName`)
+- [x] Metadata embedding (Copyright/Credit/Source/Keywords) with per-job-type keyword presets
+- [x] Optional Telegram completion notification
 
 **Planned / Suggestions**
 
@@ -114,10 +147,11 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 - **Cross-platform ingest core** — split the ingest/verify logic from the WinForms UI so a CLI-only mode is possible on non-Windows setups running PowerShell Core
 - **CI parse-check** — a lightweight GitHub Actions workflow that runs PowerShell's AST parser against `accurova_ingest.ps1` on every push/PR, catching syntax errors before they reach a user's machine
 - **Mirrored/dual-destination ingest** — copy to a second vault path (e.g. a backup drive) in the same pass, for photographers who want on-site redundancy before formatting the card
-- **Toast notification on completion** — a Windows notification when ingest finishes, most useful once auto-launch is running unattended in the background and nobody's watching the log
-- **Config schema versioning** — an internal `ConfigVersion` field so future config-shape changes (like this release's new `RawExt`/`VideoExt`/`AuxExt` fields) can auto-migrate old files instead of silently falling back to defaults
+- **Toast notification on completion** — a native Windows notification alongside (or instead of) Telegram, most useful once auto-launch is running unattended in the background
+- **Config schema versioning** — an internal `ConfigVersion` field so future config-shape changes can auto-migrate old files instead of silently falling back to defaults
 - **Adjustable duplicate-check strictness** — an option to skip the MD5 checksum pass and trust name+size alone, for users ingesting very large cards where per-file hashing adds noticeable time
-- **Customizable vault folder pattern** — the `YYYY_MM\YYYY_MM_DD [Event] [Location]` structure is currently fixed; a configurable date/folder template would suit different organizational preferences
+- **Job-type presets in the UI** — keyword presets per job type currently live in a hashtable in the script (`$JobTypeKeywords`); an in-UI editor would let users manage them without touching code
+- **Per-job-type folder template variants** — the 10-folder client scaffold is currently one fixed template for every job type; some shooters may want a different structure for e.g. corporate vs. wedding work
 - No `.env.example` equivalent is provided for the PowerShell config path defaults — a setup script or first-run wizard could reduce manual config steps
 - No automated tests for ingest logic (duplicate detection, path construction, verification counts)
 
@@ -126,6 +160,18 @@ Suggestions and feedback welcome — open an issue or reach out directly.
 ## Changelog
 
 All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
+
+### [2.0.0] - 2026-08-04
+- **Breaking:** day-folder naming changed from `YYYY_MM_DD [Event] [Location]` to `YYYY-MM-DD_ClientName_EventName`; the **Location** field was removed in favor of a new **Client Name** field, and ingested files now land in a `01_RAW` subfolder instead of directly in the day folder — existing vault folders from before this change are unaffected, but re-running an ingest for an in-progress job will create a new differently-named/structured folder rather than adding to the old one
+- Client folder scaffold — every day folder touched by an ingest now gets the full `01_RAW`…`10_Archive` structure created automatically (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive), not just wherever files happen to land
+- Metadata embedding — new **Metadata / Notifications** UI section for Copyright, Contact Email, and Website, written into every ingested file via ExifTool (`Copyright`/`Source`/`Credit` tags) on every run
+- Job Type dropdown (Wedding / Corporate / Event / Portrait / Other) layers extra keywords onto the base metadata per shoot; presets are editable in the `$JobTypeKeywords` hashtable near the top of the script
+- Optional Telegram notification on ingest completion (job name, file count, size, duration) — set a bot token + chat ID, leave blank to skip; failures are logged but never abort the ingest
+- Replaced the dry-run toggle with two explicit buttons, **START DRY RUN** and **START LIVE INGEST** (gold-trimmed to flag it as the destructive action), instead of a switch plus a single ambiguous run button
+- Fixed a rendering bug in the **File Types** row where the Video/Aux extension labels overlapped and clipped each other (a shared label helper always sized boxes at 300px regardless of column width)
+
+### [1.2.0] - 2026-08-04
+- Auto-detect now shows the SD card's volume label next to the drive dropdown (e.g. `Auto-detected: D "EOS_SD01" (DCIM found)`), not just the drive letter
 
 ### [1.1.0] - 2026-08-04
 - Camera-agnostic file typing — replaced the hardcoded NEF/MP4/LRV/INSV extension list with a **FILE TYPES** UI section (RAW / Video / Aux, comma-separated, persisted to config); works for any camera, not just the D850

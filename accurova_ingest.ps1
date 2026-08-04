@@ -17,33 +17,48 @@ function LoadConfig {
         try {
             $raw = Get-Content $ConfigFile -Raw | ConvertFrom-Json
             return @{
-                Dest     = $raw.Dest
-                LogDir   = $raw.LogDir
-                Exiftool = $raw.Exiftool
-                RawExt   = if ($raw.RawExt)   { $raw.RawExt }   else { "nef" }
-                VideoExt = if ($raw.VideoExt) { $raw.VideoExt } else { "mp4" }
-                AuxExt   = $raw.AuxExt
+                Dest           = $raw.Dest
+                LogDir         = $raw.LogDir
+                Exiftool       = $raw.Exiftool
+                RawExt         = if ($raw.RawExt)   { $raw.RawExt }   else { "nef" }
+                VideoExt       = if ($raw.VideoExt) { $raw.VideoExt } else { "mp4" }
+                AuxExt         = $raw.AuxExt
+                Copyright      = $raw.Copyright
+                ContactEmail   = $raw.ContactEmail
+                Website        = $raw.Website
+                TelegramToken  = $raw.TelegramToken
+                TelegramChatId = $raw.TelegramChatId
             }
         } catch {}
     }
     return @{
-        Dest     = "$env:USERPROFILE\Pictures\PhotoVault"
-        LogDir   = "$env:USERPROFILE\Pictures\PhotoVault\_logs"
-        Exiftool = "C:\exiftool\exiftool.exe"
-        RawExt   = "nef"
-        VideoExt = "mp4"
-        AuxExt   = ""
+        Dest           = "$env:USERPROFILE\Pictures\PhotoVault"
+        LogDir         = "$env:USERPROFILE\Pictures\PhotoVault\_logs"
+        Exiftool       = "C:\exiftool\exiftool.exe"
+        RawExt         = "nef"
+        VideoExt       = "mp4"
+        AuxExt         = ""
+        Copyright      = ""
+        ContactEmail   = ""
+        Website        = ""
+        TelegramToken  = ""
+        TelegramChatId = ""
     }
 }
 
-function SaveConfig($dest, $logDir, $exiftool, $rawExt, $videoExt, $auxExt) {
+function SaveConfig($dest, $logDir, $exiftool, $rawExt, $videoExt, $auxExt, $copyright, $contactEmail, $website, $telegramToken, $telegramChatId) {
     @{
-        Dest     = $dest
-        LogDir   = $logDir
-        Exiftool = $exiftool
-        RawExt   = $rawExt
-        VideoExt = $videoExt
-        AuxExt   = $auxExt
+        Dest           = $dest
+        LogDir         = $logDir
+        Exiftool       = $exiftool
+        RawExt         = $rawExt
+        VideoExt       = $videoExt
+        AuxExt         = $auxExt
+        Copyright      = $copyright
+        ContactEmail   = $contactEmail
+        Website        = $website
+        TelegramToken  = $telegramToken
+        TelegramChatId = $telegramChatId
     } | ConvertTo-Json | Set-Content $ConfigFile -Encoding utf8
 }
 
@@ -58,6 +73,21 @@ function ParseExtList($raw) {
 function GetFilesByExt($path, $extList) {
     if ($extList.Count -eq 0) { return @() }
     return @(Get-ChildItem -Path $path -Recurse -Include ($extList | ForEach-Object { "*.$_" }) -ErrorAction SilentlyContinue)
+}
+
+# -- CLIENT FOLDER SCAFFOLD & JOB-TYPE METADATA PRESETS -------
+$ClientFolderTemplate = @(
+    "01_RAW", "02_Catalog", "03_Selects", "04_Photoshop", "05_Exports",
+    "06_Social", "07_Prints", "08_Contracts", "09_Deliverables", "10_Archive"
+)
+
+# Extra IPTC keywords layered on top per job type. Edit these to taste.
+$JobTypeKeywords = @{
+    "Wedding"   = "wedding, bride, groom, ceremony, reception"
+    "Corporate" = "corporate, business, headshot, professional"
+    "Event"     = "event, conference, networking"
+    "Portrait"  = "portrait, portraiture, headshot"
+    "Other"     = ""
 }
 
 $Config = LoadConfig
@@ -82,7 +112,7 @@ $FONT_LOG = New-Object System.Drawing.Font("Consolas", 8.5)
 # -- FORM ----------------------------------------------------
 $Form = New-Object System.Windows.Forms.Form
 $Form.Text            = "Accurova Ingest"
-$Form.Size            = New-Object System.Drawing.Size(1140, 880)
+$Form.Size            = New-Object System.Drawing.Size(1140, 1000)
 $Form.StartPosition   = "CenterScreen"
 $Form.BackColor       = $BG
 $Form.ForeColor       = $FG
@@ -281,8 +311,13 @@ $LblSaveStatus.Size      = New-Object System.Drawing.Size(300, 18)
 $Form.Controls.Add($LblSaveStatus)
 
 $BtnSaveConfig.Add_Click({
-    $auxVal = if ($TxtAuxExt.Text -eq $TxtAuxExt.Tag) { "" } else { $TxtAuxExt.Text.Trim() }
-    SaveConfig $DestBox.TextBox.Text.Trim() $LogBox.TextBox.Text.Trim() $ExifBox.TextBox.Text.Trim() $TxtRawExt.Text.Trim() $TxtVideoExt.Text.Trim() $auxVal
+    $auxVal      = if ($TxtAuxExt.Text -eq $TxtAuxExt.Tag) { "" } else { $TxtAuxExt.Text.Trim() }
+    $copyVal     = if ($TxtCopyright.Text -eq $TxtCopyright.Tag) { "" } else { $TxtCopyright.Text.Trim() }
+    $contactVal  = if ($TxtContactEmail.Text -eq $TxtContactEmail.Tag) { "" } else { $TxtContactEmail.Text.Trim() }
+    $websiteVal  = if ($TxtWebsite.Text -eq $TxtWebsite.Tag) { "" } else { $TxtWebsite.Text.Trim() }
+    $tgTokenVal  = if ($TxtTelegramToken.Text -eq $TxtTelegramToken.Tag) { "" } else { $TxtTelegramToken.Text.Trim() }
+    $tgChatIdVal = if ($TxtTelegramChatId.Text -eq $TxtTelegramChatId.Tag) { "" } else { $TxtTelegramChatId.Text.Trim() }
+    SaveConfig $DestBox.TextBox.Text.Trim() $LogBox.TextBox.Text.Trim() $ExifBox.TextBox.Text.Trim() $TxtRawExt.Text.Trim() $TxtVideoExt.Text.Trim() $auxVal $copyVal $contactVal $websiteVal $tgTokenVal $tgChatIdVal
     $LblSaveStatus.Text = "Saved."
     $timer = New-Object System.Windows.Forms.Timer
     $timer.Interval = 2000
@@ -321,21 +356,74 @@ $Form.Controls.Add($LblFileTypesHint)
 AddDivider 434
 
 # ============================================================
+#  SECTION: METADATA  (embedded into every ingested file via ExifTool)
+# ============================================================
+AddSectionHeader "  METADATA  /  NOTIFICATIONS" 444
+
+$Form.Controls.Add((MakeLabel "COPYRIGHT" 24 474 120))
+$TxtCopyright = MakePlaceholderTextBox 24 492 120 "(c) 2026 Jane Doe"
+if ($Config.Copyright) { $TxtCopyright.Text = $Config.Copyright; $TxtCopyright.ForeColor = $FG }
+$Form.Controls.Add($TxtCopyright)
+
+$Form.Controls.Add((MakeLabel "CONTACT EMAIL" 151 474 120))
+$TxtContactEmail = MakePlaceholderTextBox 151 492 120 "you@site.com"
+if ($Config.ContactEmail) { $TxtContactEmail.Text = $Config.ContactEmail; $TxtContactEmail.ForeColor = $FG }
+$Form.Controls.Add($TxtContactEmail)
+
+$Form.Controls.Add((MakeLabel "WEBSITE" 278 474 120))
+$TxtWebsite = MakePlaceholderTextBox 278 492 120 "yoursite.com"
+if ($Config.Website) { $TxtWebsite.Text = $Config.Website; $TxtWebsite.ForeColor = $FG }
+$Form.Controls.Add($TxtWebsite)
+
+$Form.Controls.Add((MakeLabel "TG BOT TOKEN" 405 474 120))
+$TxtTelegramToken = MakePlaceholderTextBox 405 492 120 "bot token"
+if ($Config.TelegramToken) { $TxtTelegramToken.Text = $Config.TelegramToken; $TxtTelegramToken.ForeColor = $FG }
+$Form.Controls.Add($TxtTelegramToken)
+
+$Form.Controls.Add((MakeLabel "TG CHAT ID" 532 474 120))
+$TxtTelegramChatId = MakePlaceholderTextBox 532 492 120 "chat id"
+if ($Config.TelegramChatId) { $TxtTelegramChatId.Text = $Config.TelegramChatId; $TxtTelegramChatId.ForeColor = $FG }
+$Form.Controls.Add($TxtTelegramChatId)
+
+$LblMetadataHint = New-Object System.Windows.Forms.Label
+$LblMetadataHint.Text      = "Metadata written to every ingested file via ExifTool, plus Job Type keywords. Telegram fields are optional - leave blank to skip the completion notification."
+$LblMetadataHint.Font      = $FONT_SUB
+$LblMetadataHint.ForeColor = $FG_DIM
+$LblMetadataHint.Location  = New-Object System.Drawing.Point(24, 522)
+$LblMetadataHint.Size      = New-Object System.Drawing.Size(628, 18)
+$Form.Controls.Add($LblMetadataHint)
+
+AddDivider 554
+
+# ============================================================
 #  SECTION: SESSION
 # ============================================================
-AddSectionHeader "  SESSION" 444
+AddSectionHeader "  SESSION" 564
 
-$Form.Controls.Add((MakeLabel "EVENT NAME" 24 474))
-$TxtEvent = MakePlaceholderTextBox 24 492 400 "e.g. FAF Day 2"
+$Form.Controls.Add((MakeLabel "CLIENT NAME" 24 594 300))
+$TxtClient = MakePlaceholderTextBox 24 612 300 "e.g. Tan Family"
+$Form.Controls.Add($TxtClient)
+
+$Form.Controls.Add((MakeLabel "JOB TYPE" 340 594 150))
+$CmbJobType = New-Object System.Windows.Forms.ComboBox
+$CmbJobType.Location      = New-Object System.Drawing.Point(340, 612)
+$CmbJobType.Size          = New-Object System.Drawing.Size(150, 26)
+$CmbJobType.BackColor     = $PANEL
+$CmbJobType.ForeColor     = $FG
+$CmbJobType.FlatStyle     = "Flat"
+$CmbJobType.Font          = $FONT_UI
+$CmbJobType.DropDownStyle = "DropDownList"
+foreach ($jt in @("Wedding", "Corporate", "Event", "Portrait", "Other")) { $CmbJobType.Items.Add($jt) | Out-Null }
+$CmbJobType.SelectedItem = "Other"
+$Form.Controls.Add($CmbJobType)
+
+$Form.Controls.Add((MakeLabel "EVENT NAME" 24 648))
+$TxtEvent = MakePlaceholderTextBox 24 666 400 "e.g. FAF Day 2"
 $Form.Controls.Add($TxtEvent)
 
-$Form.Controls.Add((MakeLabel "LOCATION" 24 528))
-$TxtLocation = MakePlaceholderTextBox 24 546 400 "e.g. Kallang Leisure Park"
-$Form.Controls.Add($TxtLocation)
-
-$Form.Controls.Add((MakeLabel "SD CARD DRIVE" 24 582))
+$Form.Controls.Add((MakeLabel "SD CARD DRIVE" 24 702))
 $CmbDrive = New-Object System.Windows.Forms.ComboBox
-$CmbDrive.Location      = New-Object System.Drawing.Point(24, 600)
+$CmbDrive.Location      = New-Object System.Drawing.Point(24, 720)
 $CmbDrive.Size          = New-Object System.Drawing.Size(100, 26)
 $CmbDrive.BackColor     = $PANEL
 $CmbDrive.ForeColor     = $FG
@@ -350,7 +438,7 @@ $LblAutoDetect = New-Object System.Windows.Forms.Label
 $LblAutoDetect.Text      = "Scanning drives..."
 $LblAutoDetect.Font      = $FONT_SUB
 $LblAutoDetect.ForeColor = $FG_DIM
-$LblAutoDetect.Location  = New-Object System.Drawing.Point(136, 604)
+$LblAutoDetect.Location  = New-Object System.Drawing.Point(136, 724)
 $LblAutoDetect.Size      = New-Object System.Drawing.Size(300, 18)
 $Form.Controls.Add($LblAutoDetect)
 
@@ -358,7 +446,7 @@ $Form.Controls.Add($LblAutoDetect)
 $script:EjectChecked = $false
 
 $EjectTrack = New-Object System.Windows.Forms.Panel
-$EjectTrack.Location  = New-Object System.Drawing.Point(24, 636)
+$EjectTrack.Location  = New-Object System.Drawing.Point(24, 756)
 $EjectTrack.Size      = New-Object System.Drawing.Size(36, 18)
 $EjectTrack.BackColor = $PANEL
 $EjectTrack.Cursor    = "Hand"
@@ -374,7 +462,7 @@ $EjectLabel = New-Object System.Windows.Forms.Label
 $EjectLabel.Text      = "Eject SD card after ingest"
 $EjectLabel.Font      = $FONT_SUB
 $EjectLabel.ForeColor = $FG_DIM
-$EjectLabel.Location  = New-Object System.Drawing.Point(68, 637)
+$EjectLabel.Location  = New-Object System.Drawing.Point(68, 757)
 $EjectLabel.Size      = New-Object System.Drawing.Size(300, 18)
 $EjectLabel.Cursor    = "Hand"
 
@@ -402,7 +490,7 @@ $EjectLabel.Add_Click($EjectToggle)
 # Dry run banner - shown while a dry run is in progress
 $DryRunBanner = New-Object System.Windows.Forms.Panel
 $DryRunBanner.BackColor = [System.Drawing.Color]::FromArgb(60, 50, 0)
-$DryRunBanner.Location  = New-Object System.Drawing.Point(24, 662)
+$DryRunBanner.Location  = New-Object System.Drawing.Point(24, 782)
 $DryRunBanner.Size      = New-Object System.Drawing.Size(628, 24)
 $DryRunBanner.Visible   = $false
 $LblDryRunBanner = New-Object System.Windows.Forms.Label
@@ -415,7 +503,7 @@ $LblDryRunBanner.Size      = New-Object System.Drawing.Size(628, 18)
 $DryRunBanner.Controls.Add($LblDryRunBanner)
 $Form.Controls.Add($DryRunBanner)
 
-AddDivider 724
+AddDivider 844
 
 # ============================================================
 #  BUTTONS
@@ -424,7 +512,7 @@ $GOLD = [System.Drawing.Color]::FromArgb(212, 175, 55)
 
 $BtnDryRun = New-Object System.Windows.Forms.Button
 $BtnDryRun.Text      = "START DRY RUN"
-$BtnDryRun.Location  = New-Object System.Drawing.Point(24, 734)
+$BtnDryRun.Location  = New-Object System.Drawing.Point(24, 854)
 $BtnDryRun.Size      = New-Object System.Drawing.Size(170, 38)
 $BtnDryRun.BackColor = $PANEL
 $BtnDryRun.ForeColor = $FG
@@ -437,7 +525,7 @@ $Form.Controls.Add($BtnDryRun)
 
 $BtnLiveIngest = New-Object System.Windows.Forms.Button
 $BtnLiveIngest.Text      = "START LIVE INGEST"
-$BtnLiveIngest.Location  = New-Object System.Drawing.Point(204, 734)
+$BtnLiveIngest.Location  = New-Object System.Drawing.Point(204, 854)
 $BtnLiveIngest.Size      = New-Object System.Drawing.Size(170, 38)
 $BtnLiveIngest.BackColor = $TEAL
 $BtnLiveIngest.ForeColor = $BG
@@ -450,7 +538,7 @@ $Form.Controls.Add($BtnLiveIngest)
 
 $BtnStop = New-Object System.Windows.Forms.Button
 $BtnStop.Text      = "STOP"
-$BtnStop.Location  = New-Object System.Drawing.Point(384, 734)
+$BtnStop.Location  = New-Object System.Drawing.Point(384, 854)
 $BtnStop.Size      = New-Object System.Drawing.Size(80, 38)
 $BtnStop.BackColor = $RED
 $BtnStop.ForeColor = $FG
@@ -465,17 +553,17 @@ $LblStatus = New-Object System.Windows.Forms.Label
 $LblStatus.Text      = "Ready."
 $LblStatus.Font      = $FONT_SUB
 $LblStatus.ForeColor = $FG_DIM
-$LblStatus.Location  = New-Object System.Drawing.Point(484, 746)
+$LblStatus.Location  = New-Object System.Drawing.Point(484, 866)
 $LblStatus.Size      = New-Object System.Drawing.Size(168, 18)
 $Form.Controls.Add($LblStatus)
 
-AddDivider 782
+AddDivider 902
 
 # ============================================================
 #  PROGRESS
 # ============================================================
 $ProgressBar = New-Object System.Windows.Forms.ProgressBar
-$ProgressBar.Location  = New-Object System.Drawing.Point(24, 792)
+$ProgressBar.Location  = New-Object System.Drawing.Point(24, 912)
 $ProgressBar.Size      = New-Object System.Drawing.Size(628, 14)
 $ProgressBar.Minimum   = 0
 $ProgressBar.Maximum   = 100
@@ -489,7 +577,7 @@ $LblPct = New-Object System.Windows.Forms.Label
 $LblPct.Text      = "0%"
 $LblPct.Font      = New-Object System.Drawing.Font("Segoe UI Semibold", 9)
 $LblPct.ForeColor = $TEAL
-$LblPct.Location  = New-Object System.Drawing.Point(24, 814)
+$LblPct.Location  = New-Object System.Drawing.Point(24, 934)
 $LblPct.Size      = New-Object System.Drawing.Size(60, 18)
 $Form.Controls.Add($LblPct)
 
@@ -497,7 +585,7 @@ $LblFiles = New-Object System.Windows.Forms.Label
 $LblFiles.Text      = "0 / 0 files"
 $LblFiles.Font      = $FONT_SUB
 $LblFiles.ForeColor = $FG_DIM
-$LblFiles.Location  = New-Object System.Drawing.Point(90, 814)
+$LblFiles.Location  = New-Object System.Drawing.Point(90, 934)
 $LblFiles.Size      = New-Object System.Drawing.Size(160, 18)
 $Form.Controls.Add($LblFiles)
 
@@ -505,7 +593,7 @@ $LblSpeed = New-Object System.Windows.Forms.Label
 $LblSpeed.Text      = ""
 $LblSpeed.Font      = $FONT_SUB
 $LblSpeed.ForeColor = $FG_DIM
-$LblSpeed.Location  = New-Object System.Drawing.Point(280, 814)
+$LblSpeed.Location  = New-Object System.Drawing.Point(280, 934)
 $LblSpeed.Size      = New-Object System.Drawing.Size(120, 18)
 $Form.Controls.Add($LblSpeed)
 
@@ -513,7 +601,7 @@ $LblETA = New-Object System.Windows.Forms.Label
 $LblETA.Text      = ""
 $LblETA.Font      = $FONT_SUB
 $LblETA.ForeColor = $FG_DIM
-$LblETA.Location  = New-Object System.Drawing.Point(430, 814)
+$LblETA.Location  = New-Object System.Drawing.Point(430, 934)
 $LblETA.Size      = New-Object System.Drawing.Size(222, 18)
 $Form.Controls.Add($LblETA)
 
@@ -521,7 +609,7 @@ $LblCurrentFile = New-Object System.Windows.Forms.Label
 $LblCurrentFile.Text      = ""
 $LblCurrentFile.Font      = $FONT_SUB
 $LblCurrentFile.ForeColor = $FG_DIM
-$LblCurrentFile.Location  = New-Object System.Drawing.Point(24, 834)
+$LblCurrentFile.Location  = New-Object System.Drawing.Point(24, 954)
 $LblCurrentFile.Size      = New-Object System.Drawing.Size(628, 18)
 $Form.Controls.Add($LblCurrentFile)
 
@@ -533,7 +621,7 @@ $Form.Controls.Add($LblCurrentFile)
 $VDivider = New-Object System.Windows.Forms.Panel
 $VDivider.BackColor = $PANEL
 $VDivider.Location  = New-Object System.Drawing.Point(668, 86)
-$VDivider.Size      = New-Object System.Drawing.Size(1, 754)
+$VDivider.Size      = New-Object System.Drawing.Size(1, 874)
 $Form.Controls.Add($VDivider)
 
 $LblLogHeader = New-Object System.Windows.Forms.Label
@@ -548,7 +636,7 @@ $Form.Controls.Add($LblLogHeader)
 
 $TxtLog = New-Object System.Windows.Forms.RichTextBox
 $TxtLog.Location    = New-Object System.Drawing.Point(685, 110)
-$TxtLog.Size        = New-Object System.Drawing.Size(431, 730)
+$TxtLog.Size        = New-Object System.Drawing.Size(431, 850)
 $TxtLog.BackColor   = $PANEL
 $TxtLog.ForeColor   = $FG_DIM
 $TxtLog.Font        = $FONT_LOG
@@ -666,7 +754,7 @@ function IsDuplicateInVault($destIndex, $key, $sourceLength, $sourcePath) {
 # $sourceFiles: pre-gathered FileInfo list for this step (e.g. $RawFiles)
 function RunExifStep($sourceFiles, $fileMap, $destIndex, $isDryRun, $dest, $subFolder = "") {
     $subPart  = if ($subFolder -ne "") { "\$subFolder" } else { "" }
-    $destPattern = "$dest\%Y_%m\%Y_%m_%d$($script:Suffix)$subPart"
+    $destPattern = "$dest\%Y_%m\%Y-%m-%d$($script:Suffix)\01_RAW$subPart"
 
     if ($isDryRun) {
         foreach ($f in $sourceFiles) {
@@ -708,7 +796,7 @@ function RunExifStep($sourceFiles, $fileMap, $destIndex, $isDryRun, $dest, $subF
     $argFile = [System.IO.Path]::GetTempFileName()
     Set-Content -Path $argFile -Value ($toCopy | ForEach-Object { $_.FullName }) -Encoding UTF8
 
-    $argStr = "-@ `"$argFile`" -d `"$destPattern`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" -o `".`" --overwrite_original -progress"
+    $argStr = "-@ `"$argFile`" -d `"$destPattern`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" $($script:MetadataArgs) -o `".`" --overwrite_original -progress"
 
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     $psi.FileName               = $ExifBox.TextBox.Text.Trim()
@@ -793,6 +881,20 @@ function VerifyIngest($sourceFiles, $destPath, $isDryRun) {
     }
 }
 
+# -- TELEGRAM NOTIFICATION -------------------------------------
+# Best-effort: failures are logged but never abort or fail the ingest.
+function SendTelegramNotification($token, $chatId, $message) {
+    if (-not $token -or -not $chatId) { return }
+    try {
+        $uri  = "https://api.telegram.org/bot$token/sendMessage"
+        $body = @{ chat_id = $chatId; text = $message }
+        Invoke-RestMethod -Uri $uri -Method Post -Body $body -TimeoutSec 10 | Out-Null
+        AppendLog "[OK]    Telegram notification sent." $GREEN
+    } catch {
+        AppendLog "[WARN]  Telegram notification failed: $($_.Exception.Message)" $YELLOW
+    }
+}
+
 # ============================================================
 #  RUN BUTTONS
 # ============================================================
@@ -831,13 +933,28 @@ function StartIngest($IsDryRun) {
         ResetUI; return
     }
 
-    $EvtVal = $TxtEvent.Text.Trim()
-    $LocVal = $TxtLocation.Text.Trim()
-    if ($EvtVal -eq $TxtEvent.Tag)    { $EvtVal = "" }
-    if ($LocVal -eq $TxtLocation.Tag) { $LocVal = "" }
+    $ClientVal = $TxtClient.Text.Trim()
+    $EvtVal    = $TxtEvent.Text.Trim()
+    if ($ClientVal -eq $TxtClient.Tag) { $ClientVal = "" }
+    if ($EvtVal -eq $TxtEvent.Tag)     { $EvtVal = "" }
+    # Day-folder name: YYYY-MM-DD[_Client][_Event] - matches the client-facing
+    # naming convention, enforced here instead of typed manually per shoot.
     $script:Suffix = ""
-    if ($EvtVal -ne "") { $script:Suffix += " $EvtVal" }
-    if ($LocVal -ne "") { $script:Suffix += " $LocVal" }
+    if ($ClientVal -ne "") { $script:Suffix += "_$ClientVal" }
+    if ($EvtVal -ne "")    { $script:Suffix += "_$EvtVal" }
+    $script:Suffix = $script:Suffix -replace '[\\/:*?"<>|]', '-'
+
+    $JobTypeVal  = $CmbJobType.SelectedItem.ToString()
+    $KeywordsVal = $JobTypeKeywords[$JobTypeVal]
+    $CopyrightVal = $TxtCopyright.Text.Trim()
+    $WebsiteVal   = if ($TxtWebsite.Text -eq $TxtWebsite.Tag) { "" } else { $TxtWebsite.Text.Trim() }
+    $ContactVal   = if ($TxtContactEmail.Text -eq $TxtContactEmail.Tag) { "" } else { $TxtContactEmail.Text.Trim() }
+    $metaParts = @()
+    if ($CopyrightVal -ne "") { $metaParts += "-Copyright=`"$CopyrightVal`"" }
+    if ($WebsiteVal   -ne "") { $metaParts += "-Credit=`"$WebsiteVal`"" }
+    if ($ContactVal   -ne "") { $metaParts += "-Source=`"$ContactVal`"" }
+    if ($KeywordsVal  -ne "") { $metaParts += "-Keywords=`"$KeywordsVal`"" }
+    $script:MetadataArgs = $metaParts -join " "
 
     $RawExtList   = ParseExtList $TxtRawExt.Text.Trim()
     $VideoExtList = ParseExtList $TxtVideoExt.Text.Trim()
@@ -945,7 +1062,7 @@ function StartIngest($IsDryRun) {
     AppendLog "`n============================================" $TEAL
     AppendLog " ACCUROVA  [$modeLabel]  -  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" $TEAL
     AppendLog " Source : $SD_CARD" $FG
-    AppendLog " Dest   : $DEST_LIVE\{YYYY_MM}\{YYYY_MM_DD}$($script:Suffix)" $FG
+    AppendLog " Dest   : $DEST_LIVE\{YYYY_MM}\{YYYY-MM-DD}$($script:Suffix)\01_RAW" $FG
     AppendLog "============================================" $TEAL
 
     foreach ($step in @(
@@ -978,7 +1095,7 @@ function StartIngest($IsDryRun) {
             } else {
                 AppendLog "[WARN]  Orphan JPG (no matching RAW file): $($Jpg.Name)" $YELLOW
                 if (-not $IsDryRun) {
-                    $argStr = "-d `"$DEST_LIVE\%Y_%m\%Y_%m_%d$($script:Suffix)`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" -o `".`" --overwrite_original `"$($Jpg.FullName)`""
+                    $argStr = "-d `"$DEST_LIVE\%Y_%m\%Y-%m-%d$($script:Suffix)\01_RAW`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" $($script:MetadataArgs) -o `".`" --overwrite_original `"$($Jpg.FullName)`""
                     $psi2 = New-Object System.Diagnostics.ProcessStartInfo
                     $psi2.FileName = $EXIFTOOL_LIVE; $psi2.Arguments = $argStr
                     $psi2.RedirectStandardOutput = $true; $psi2.UseShellExecute = $false; $psi2.CreateNoWindow = $true
@@ -990,6 +1107,30 @@ function StartIngest($IsDryRun) {
     }
     if ($OrphanCount -eq 0) { AppendLog "[OK]    No orphan JPGs." $GREEN }
     else { AppendLog "[WARN]  $OrphanCount orphan JPG(s) $(if ($IsDryRun) { 'would be copied' } else { 'copied' })." $YELLOW }
+
+    # -- CLIENT FOLDER SCAFFOLD -----------------------------------
+    # Ensures every day folder under the vault has the full 10-folder
+    # client structure (01_RAW..10_Archive), not just the ones ExifTool
+    # happened to create while copying RAW/video files.
+    $LblStatus.Text = "Building client folder structure..."
+    if ($IsDryRun) {
+        AppendLog "`n[INFO]  Would create client folder structure ($($ClientFolderTemplate -join ', ')) in touched day folder(s)." $FG_DIM
+    } else {
+        $ScaffoldCount = 0
+        foreach ($MonthFolder in (Get-ChildItem -Path $DEST_LIVE -Directory -ErrorAction SilentlyContinue)) {
+            $DayFolders = Get-ChildItem -Path $MonthFolder.FullName -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^\d{4}-\d{2}-\d{2}' }
+            foreach ($DayFolder in $DayFolders) {
+                foreach ($SubFolder in $ClientFolderTemplate) {
+                    New-Item -ItemType Directory -Force -Path (Join-Path $DayFolder.FullName $SubFolder) | Out-Null
+                }
+                $ScaffoldCount++
+            }
+        }
+        if ($ScaffoldCount -gt 0) {
+            AppendLog "`n[OK]    Client folder structure ensured in $ScaffoldCount day folder(s)." $GREEN
+        }
+    }
 
     $ProgressBar.Value   = 100
     $LblPct.Text         = "100%"
@@ -1027,6 +1168,18 @@ function StartIngest($IsDryRun) {
                 AppendLog "[OK]    SD card ejected." $GREEN
             } else { AppendLog "[WARN]  Remove SD card manually." $YELLOW }
         } catch { AppendLog "[WARN]  Eject error - remove manually." $YELLOW }
+    }
+
+    if (-not $IsDryRun) {
+        $tgToken  = if ($TxtTelegramToken.Text -eq $TxtTelegramToken.Tag) { "" } else { $TxtTelegramToken.Text.Trim() }
+        $tgChatId = if ($TxtTelegramChatId.Text -eq $TxtTelegramChatId.Tag) { "" } else { $TxtTelegramChatId.Text.Trim() }
+        if ($tgToken -ne "" -and $tgChatId -ne "") {
+            $jobLabel = @($ClientVal, $EvtVal) | Where-Object { $_ -ne "" }
+            $jobLabel = if ($jobLabel.Count -gt 0) { $jobLabel -join " - " } else { "Untitled job" }
+            $totalFiles = $RawFiles.Count + $VideoFiles.Count + $AuxFiles.Count
+            $tgMessage = "Accurova Ingest complete - $jobLabel`n$totalFiles files, $(FormatBytes $TotalTransferBytes), ${elapsedStr}."
+            SendTelegramNotification $tgToken $tgChatId $tgMessage
+        }
     }
 
     $finalMsg            = "$(if ($IsDryRun) { 'Dry run complete' } else { 'Done!' })  $elapsedStr  |  avg $avgSpeed"
