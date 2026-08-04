@@ -1,8 +1,13 @@
 {
-    "Dest":     "C:\\Users\\<you>\\Pictures\\PhotoVault",
-    "LogDir":   "C:\\Users\\<you>\\Pictures\\PhotoVault\\_logs",
-    "Exiftool": "C:\\exiftool\\exiftool.exe",
-    "RawExt":   "nef, cr2, cr3, arw, raf, orf, rw2, dng",
-    "VideoExt": "mp4, mov",
-    "AuxExt":   "lrv, insv"
+    "Dest":           "C:\\Users\\<you>\\Pictures\\PhotoVault",
+    "LogDir":         "C:\\Users\\<you>\\Pictures\\PhotoVault\\_logs",
+    "Exiftool":       "C:\\exiftool\\exiftool.exe",
+    "RawExt":         "nef, cr2, cr3, arw, raf, orf, rw2, dng",
+    "VideoExt":       "mp4, mov",
+    "AuxExt":         "lrv, insv",
+    "Copyright":      "(c) 2026 Jane Doe",
+    "ContactEmail":   "you@example.com",
+    "Website":        "https://yoursite.com",
+    "TelegramToken":  "",
+    "TelegramChatId": ""
 }
