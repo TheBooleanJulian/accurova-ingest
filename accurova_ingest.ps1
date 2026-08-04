@@ -587,7 +587,9 @@ function DetectSDCard {
     foreach ($drive in [System.IO.DriveInfo]::GetDrives()) {
         if ($drive.DriveType -eq "Removable" -and $drive.IsReady) {
             if (Test-Path (Join-Path $drive.RootDirectory.FullName "DCIM")) {
-                return $drive.Name.TrimEnd("\")
+                $label = $drive.VolumeLabel
+                if (-not $label) { $label = "(no label)" }
+                return @{ Letter = $drive.Name.TrimEnd("\"); Label = $label }
             }
         }
     }
@@ -597,9 +599,9 @@ function DetectSDCard {
 $Form.Add_Shown({
     $found = DetectSDCard
     if ($found) {
-        $item = $found + "\"
+        $item = $found.Letter + "\"
         if ($CmbDrive.Items.Contains($item)) { $CmbDrive.SelectedItem = $item }
-        $LblAutoDetect.Text      = "Auto-detected: $found (DCIM found)"
+        $LblAutoDetect.Text      = "Auto-detected: $($found.Letter) `"$($found.Label)`" (DCIM found)"
         $LblAutoDetect.ForeColor = $GREEN
     } else {
         $LblAutoDetect.Text      = "No SD card detected - select manually"
@@ -610,9 +612,9 @@ $Form.Add_Shown({
 $CmbDrive.Add_DropDown({
     $found = DetectSDCard
     if ($found) {
-        $item = $found + "\"
+        $item = $found.Letter + "\"
         if ($CmbDrive.Items.Contains($item)) { $CmbDrive.SelectedItem = $item }
-        $LblAutoDetect.Text      = "Auto-detected: $found"
+        $LblAutoDetect.Text      = "Auto-detected: $($found.Letter) `"$($found.Label)`""
         $LblAutoDetect.ForeColor = $GREEN
     }
 })
