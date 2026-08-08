@@ -1,10 +1,12 @@
 <div align="center">
 
-# Accurova Ingest
+![VaultFlow](assets/vaultflow-logo.png)
+
+# VaultFlow Ingest
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
 
-![Version](https://img.shields.io/badge/version-2.0.0-00D4C8)
+![Version](https://img.shields.io/badge/version-1.6.0-00D4C8)
 ![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
 
@@ -14,30 +16,31 @@
 
 ## What it does
 
-Accurova Ingest is a Windows PowerShell GUI utility for photographers and videographers. It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts your RAW, video, and auxiliary/proxy footage into a structured client vault — skipping duplicates, flagging orphan JPGs, embedding your copyright/contact metadata, and verifying the copy before you format the card. It's camera-agnostic: tell it your RAW/video/aux file extensions once (Canon CR2/CR3, Sony ARW, Fujifilm RAF, GoPro/Insta360 LRV/INSV, etc.) and it works the same as it does for a Nikon NEF shooter. Config is persisted to a local JSON file so your vault path, log folder, ExifTool location, file types, and metadata defaults are remembered between runs.
+VaultFlow Ingest is a Windows PowerShell GUI utility for photographers and videographers. It auto-detects the SD card, reads EXIF capture dates via ExifTool, and sorts your RAW, video, audio, and auxiliary/proxy footage into a structured client vault — skipping duplicates, flagging orphan JPGs, embedding your copyright/contact metadata, and verifying the copy before you format the card. It's camera-agnostic: tell it your RAW/video/audio/aux file extensions once (Canon CR2/CR3, Sony ARW, Fujifilm RAF, GoPro/Insta360 LRV/INSV, WAV field audio, etc.) and it works the same as it does for a Nikon NEF shooter. Config is persisted to a local JSON file so your vault path, log folder, ExifTool location, file types, and metadata defaults are remembered between runs.
 
-Each ingest creates a full client-ready folder structure:
+Each ingest creates a full client-ready folder structure, with `01_RAW` itself pre-sorted by media type:
 
 ```
-Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
-  |-- 01_RAW           <- ingested RAW/video/aux files land here (aux nests in 01_RAW\aux)
-  |-- 02_Catalog
-  |-- 03_Selects
-  |-- 04_Photoshop
-  |-- 05_Exports
-  |-- 06_Social
-  |-- 07_Prints
-  |-- 08_Contracts
-  |-- 09_Deliverables
-  `-- 10_Archive
+Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName_Location\
+  |-- 01_RAW
+  |   |-- RAW        <- RAW files (nef, cr2, arw, ...)
+  |   |-- JPG         <- orphan JPGs with no matching RAW file
+  |   |-- VIDEO       <- video files (mp4, mov, ...)
+  |   |-- AUDIO       <- audio files (wav, mp3, ...)
+  |   `-- AUX         <- proxy/360 footage (lrv, insv, ...)
+  |-- 02_SELECTS
+  |-- 03_EDITED
+  |-- 04_EXPORTS
+  `-- 05_DELIVERED
 ```
 
 ## Features
 
 - Auto-detects SD card by looking for a `DCIM` folder on removable drives
-- Camera-agnostic file typing — configure your own RAW / video / auxiliary (proxy, 360 footage, etc.) extensions instead of a hardcoded list
-- Creates the full 10-folder client structure (`01_RAW` … `10_Archive`) under every day folder touched by the ingest, not just where files land
-- Client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName`) enforced automatically instead of typed free-text per shoot
+- Camera-agnostic file typing — configure your own RAW / video / audio / auxiliary (proxy, 360 footage, etc.) extensions instead of a hardcoded list
+- `01_RAW` pre-sorted by media type into `RAW` / `JPG` / `VIDEO` / `AUDIO` / `AUX` subfolders as files are ingested, instead of landing mixed together
+- Creates the full 5-folder client structure (`01_RAW` … `05_DELIVERED`) under every day folder touched by the ingest, not just where files land
+- Client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName_Location`) enforced automatically instead of typed free-text per shoot
 - Embeds Copyright, Credit (website), Source (contact), and job-type keywords into every ingested file via ExifTool — set once in **Metadata**, applied every run
 - Job Type dropdown (Wedding / Corporate / Event / Portrait / Other) layers extra keywords on top of your base metadata
 - Duplicate detection against the existing vault before copying, confirmed by checksum (not just filename/size) so recycled camera file-counters don't produce false positives
@@ -48,8 +51,8 @@ Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
 - Post-ingest verification (source vs. destination file and byte counts)
 - Optional SD card eject on completion
 - Optional Telegram notification on ingest completion (job name, file count, size, duration) — set a bot token + chat ID in **Metadata / Notifications**, leave blank to skip
-- Optional auto-launch on SD card insertion (Task Scheduler event trigger — see `accurova_register_autolaunch.ps1`)
-- Persisted config (`accurova_config.json`) for vault path, log folder, ExifTool path, file extensions, and metadata/notification defaults
+- Optional auto-launch on SD card insertion (Task Scheduler event trigger — see `backend/vaultflow_register_autolaunch.ps1`)
+- Persisted config (`vaultflow_config.json`) for vault path, log folder, ExifTool path, file extensions, and metadata/notification defaults
 
 ## Tech Stack
 
@@ -60,19 +63,19 @@ Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
 
 ## Quick Start
 
-1. Copy `accurova_config.example.json` to `accurova_config.json` in the same folder as the script and adjust the paths, or set them from the UI after launching.
-2. Run `accurova_ingest.ps1`.
+1. Copy `vaultflow_config.example.json` to `vaultflow_config.json` in the same folder as the script and adjust the paths, or set them from the UI after launching.
+2. Run `vaultflow_ingest.ps1`.
 3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths (e.g. `D:\Photos\Vault`, `D:\Photos\Vault\_logs`, `C:\exiftool\exiftool.exe`), then click **Save Paths**.
-4. Under **File Types**, set your camera's extensions — e.g. **RAW**: `nef` (Nikon), `cr2, cr3` (Canon), `arw` (Sony), `raf` (Fujifilm); **Video**: `mp4, mov`; **Aux** (optional): `lrv, insv` for GoPro/Insta360 proxy or 360 footage.
+4. Under **File Types**, set your camera's extensions — e.g. **RAW**: `nef` (Nikon), `cr2, cr3` (Canon), `arw` (Sony), `raf` (Fujifilm); **Video**: `mp4, mov`; **Audio**: `wav, mp3`; **Aux** (optional): `lrv, insv` for GoPro/Insta360 proxy or 360 footage.
 5. Under **Metadata / Notifications**, set your **Copyright**, **Contact Email**, and **Website** — written into every ingested file's metadata. Optionally add a **Telegram Bot Token** and **Chat ID** to get a message when ingest finishes.
-6. Enter a **Client Name** and pick a **Job Type**; optionally an **Event Name** too — these build the day folder's name (`YYYY-MM-DD_ClientName_EventName`) and select which extra keywords get embedded.
+6. Enter a **Client Name** and pick a **Job Type**; optionally an **Event Name** and/or **Location** too — these build the day folder's name (`YYYY-MM-DD_ClientName_EventName_Location`) and select which extra keywords get embedded.
 7. Confirm the detected **SD Card Drive** (or pick manually).
 8. Toggle **Eject SD card after ingest** if wanted.
 9. Click **START DRY RUN** to preview without copying, or **START LIVE INGEST** to actually copy.
 
 ### Optional: auto-launch on SD card insert
 
-Run `accurova_register_autolaunch.ps1` once from an elevated (Administrator) PowerShell. It registers a Scheduled Task that fires `accurova_autolaunch.ps1` whenever Windows detects a new device; that script checks for a DCIM-bearing removable drive and pops the GUI up automatically if one is found (no-ops otherwise, and no-ops if the app is already running).
+Run `backend\vaultflow_register_autolaunch.ps1` once from an elevated (Administrator) PowerShell. It registers a Scheduled Task that fires `backend\vaultflow_autolaunch.ps1` whenever Windows detects a new device; that script checks for a DCIM-bearing removable drive and pops the GUI up automatically if one is found (no-ops otherwise, and no-ops if the app is already running).
 
 ## Requirements
 
@@ -89,6 +92,7 @@ Run `accurova_register_autolaunch.ps1` once from an elevated (Administrator) Pow
 | `Exiftool` | Yes | Full path to the ExifTool executable, e.g. `C:\exiftool\exiftool.exe` |
 | `RawExt` | Yes | Comma-separated RAW extensions, no dots, e.g. `nef, cr2, cr3, arw, raf, orf, rw2, dng` |
 | `VideoExt` | Yes | Comma-separated video extensions, e.g. `mp4, mov` |
+| `AudioExt` | No | Comma-separated audio extensions, e.g. `wav, mp3` — leave blank to skip this category |
 | `AuxExt` | No | Comma-separated proxy/360 extensions, e.g. `lrv, insv` — leave blank to skip this category |
 | `Copyright` | No | Written to the ExifTool `Copyright` tag on every ingested file, e.g. `(c) 2026 Jane Doe` |
 | `ContactEmail` | No | Written to the ExifTool `Source` tag |
@@ -96,18 +100,21 @@ Run `accurova_register_autolaunch.ps1` once from an elevated (Administrator) Pow
 | `TelegramToken` | No | Telegram bot token for the completion notification — leave blank to disable |
 | `TelegramChatId` | No | Telegram chat ID to notify — leave blank to disable |
 
-Config is stored in `accurova_config.json` next to the script. Copy `accurova_config.example.json` to get started.
+Config is stored in `vaultflow_config.json` next to the script. Copy `vaultflow_config.example.json` to get started.
 
-Job Type and its keyword presets (Wedding/Corporate/Event/Portrait/Other) aren't persisted per-job — they're picked fresh each ingest from the dropdown. To change what keywords each job type embeds, edit the `$JobTypeKeywords` hashtable near the top of `accurova_ingest.ps1`.
+Job Type and its keyword presets (Wedding/Corporate/Event/Portrait/Other) aren't persisted per-job — they're picked fresh each ingest from the dropdown. To change what keywords each job type embeds, edit the `$JobTypeKeywords` hashtable near the top of `vaultflow_ingest.ps1`.
 
 ## Project Structure
 
 ```
-accurova-ingest/
-|-- accurova_ingest.ps1
-|-- accurova_autolaunch.ps1
-|-- accurova_register_autolaunch.ps1
-|-- accurova_config.example.json
+vaultflow-ingest/
+|-- vaultflow_ingest.ps1          <- run this
+|-- vaultflow_config.example.json
+|-- backend/
+|   |-- vaultflow_autolaunch.ps1
+|   `-- vaultflow_register_autolaunch.ps1
+|-- assets/
+|   `-- vaultflow-logo.png
 |-- LICENSE
 |-- COMMERCIAL-LICENSE.md
 `-- README.md
@@ -115,17 +122,20 @@ accurova-ingest/
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`), staying at `MAJOR` version `1` while it has a single known user and no compatibility contract to keep:
 
-- **MAJOR** — breaking changes to config format, folder structure, or workflow that require user action
-- **MINOR** — new features that are backward compatible (new toggles, new file types, new UI sections)
-- **PATCH** — bug fixes and small tweaks with no behavior change for existing users
+- **MAJOR** stays `1` until there's a reason to promise stability to other users
+- **MINOR** — breaking changes to config format, folder structure, or workflow, as well as new backward-compatible features — both bump MINOR rather than MAJOR
+- **PATCH** — bug fixes and small tweaks with no behavior change
+
+As of 2026-08-09, versioning stops bumping MAJOR — `2.0.0`–`5.0.0` were retroactively renumbered to `1.3.0`–`1.6.0` so the changelog reads as one continuous MINOR sequence from `1.0.0` onward instead of implying a stability contract that was never real. See the changelog entry at `1.6.0` for details.
 
 ## Status / Roadmap
 
 **Done**
 
-- [x] EXIF-based date sorting for configurable RAW, video, and auxiliary (proxy/360) file types
+- [x] EXIF-based date sorting for configurable RAW, video, audio, and auxiliary (proxy/360) file types
+- [x] `01_RAW` split into `RAW`/`JPG`/`VIDEO`/`AUDIO`/`AUX` subfolders by media type
 - [x] Camera-agnostic file typing — no longer hardcoded to a single body's extensions
 - [x] Duplicate detection (name + size + checksum) and orphan JPG flagging
 - [x] Dry run mode and live progress reporting
@@ -133,7 +143,7 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 - [x] Persisted JSON config with in-UI editing
 - [x] Two-column WinForms layout with live output log
 - [x] Optional auto-launch on SD card insertion via Task Scheduler
-- [x] Client folder scaffold (`01_RAW`…`10_Archive`) created automatically under every day folder
+- [x] Client folder scaffold (`01_RAW`…`05_DELIVERED`) created automatically under every day folder
 - [x] Enforced client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName`)
 - [x] Metadata embedding (Copyright/Credit/Source/Keywords) with per-job-type keyword presets
 - [x] Optional Telegram completion notification
@@ -145,13 +155,13 @@ This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PA
 - **Structured logging** — write machine-readable (JSON/CSV) ingest logs alongside the human-readable log for easier auditing over time
 - **Packaging** — distribute as a signed `.exe` (e.g. via ps2exe) so it can run without an explicit PowerShell execution policy change
 - **Cross-platform ingest core** — split the ingest/verify logic from the WinForms UI so a CLI-only mode is possible on non-Windows setups running PowerShell Core
-- **CI parse-check** — a lightweight GitHub Actions workflow that runs PowerShell's AST parser against `accurova_ingest.ps1` on every push/PR, catching syntax errors before they reach a user's machine
+- **CI parse-check** — a lightweight GitHub Actions workflow that runs PowerShell's AST parser against `vaultflow_ingest.ps1` on every push/PR, catching syntax errors before they reach a user's machine
 - **Mirrored/dual-destination ingest** — copy to a second vault path (e.g. a backup drive) in the same pass, for photographers who want on-site redundancy before formatting the card
 - **Toast notification on completion** — a native Windows notification alongside (or instead of) Telegram, most useful once auto-launch is running unattended in the background
 - **Config schema versioning** — an internal `ConfigVersion` field so future config-shape changes can auto-migrate old files instead of silently falling back to defaults
 - **Adjustable duplicate-check strictness** — an option to skip the MD5 checksum pass and trust name+size alone, for users ingesting very large cards where per-file hashing adds noticeable time
 - **Job-type presets in the UI** — keyword presets per job type currently live in a hashtable in the script (`$JobTypeKeywords`); an in-UI editor would let users manage them without touching code
-- **Per-job-type folder template variants** — the 10-folder client scaffold is currently one fixed template for every job type; some shooters may want a different structure for e.g. corporate vs. wedding work
+- **Per-job-type folder template variants** — the 5-folder client scaffold is currently one fixed template for every job type; some shooters may want a different structure for e.g. corporate vs. wedding work
 - No `.env.example` equivalent is provided for the PowerShell config path defaults — a setup script or first-run wizard could reduce manual config steps
 - No automated tests for ingest logic (duplicate detection, path construction, verification counts)
 
@@ -161,9 +171,23 @@ Suggestions and feedback welcome — open an issue or reach out directly.
 
 All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
 
-### [2.0.0] - 2026-08-04
+### [1.6.0] - 2026-08-09
+- Versioning stops bumping MAJOR — with a single known user and no compatibility contract to keep, MAJOR bumps for every folder/config-breaking tweak (2.0.0 → 5.0.0 in one day) added ceremony without adding information; those versions are retroactively renumbered below (2.0.0→1.3.0, 3.0.0→1.4.0, 4.0.0→1.5.0) so the changelog reads as one continuous MINOR sequence — see **Versioning** above
+- **Location** field restored to the **SESSION** section (dropped in what's now 1.3.0); day-folder naming is now `YYYY-MM-DD_ClientName_EventName_Location` — existing vault folders are unaffected, new ingests append Location as a fourth optional segment
+
+### [1.5.0] - 2026-08-09
+- **Breaking:** `01_RAW` is now split into `RAW` / `JPG` / `VIDEO` / `AUDIO` / `AUX` subfolders by media type instead of landing everything in `01_RAW` directly (aux previously nested in `01_RAW\aux`); existing vault folders are unaffected, new ingests use the subfoldered layout
+- New **Audio** file-type category (`AudioExt`, default `wav`) alongside RAW/Video/Aux — set under **File Types**, defaults to `wav` if left blank
+- Automation scripts moved into `backend/` (`vaultflow_autolaunch.ps1`, `vaultflow_register_autolaunch.ps1`) so `vaultflow_ingest.ps1` at the repo root is unambiguously the file to run
+- Added a VaultFlow window icon and in-app logo badge, plus the full logo in this README
+
+### [1.4.0] - 2026-08-09
+- **Breaking:** rebranded from Accurova Ingest to **VaultFlow Ingest** — all scripts, config files, UI text, and docs renamed (`accurova_*.ps1` → `vaultflow_*.ps1`, `accurova_config.json` → `vaultflow_config.json`); rename your existing config file to match, or the app will fall back to defaults
+- **Breaking:** client folder scaffold reduced from 10 folders to 5 — `01_RAW`, `02_SELECTS`, `03_EDITED`, `04_EXPORTS`, `05_DELIVERED`, replacing `01_RAW`…`10_Archive` (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive); existing vault folders are unaffected, but new day folders (and re-scaffolds of existing ones) will only get the new 5 folders
+
+### [1.3.0] - 2026-08-04
 - **Breaking:** day-folder naming changed from `YYYY_MM_DD [Event] [Location]` to `YYYY-MM-DD_ClientName_EventName`; the **Location** field was removed in favor of a new **Client Name** field, and ingested files now land in a `01_RAW` subfolder instead of directly in the day folder — existing vault folders from before this change are unaffected, but re-running an ingest for an in-progress job will create a new differently-named/structured folder rather than adding to the old one
-- Client folder scaffold — every day folder touched by an ingest now gets the full `01_RAW`…`10_Archive` structure created automatically (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive), not just wherever files happen to land
+- Client folder scaffold — every day folder touched by an ingest now gets the full `01_RAW`…`10_Archive` structure created automatically (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive), not just wherever files happen to land (superseded by the 5-folder scaffold in 1.4.0)
 - Metadata embedding — new **Metadata / Notifications** UI section for Copyright, Contact Email, and Website, written into every ingested file via ExifTool (`Copyright`/`Source`/`Credit` tags) on every run
 - Job Type dropdown (Wedding / Corporate / Event / Portrait / Other) layers extra keywords onto the base metadata per shoot; presets are editable in the `$JobTypeKeywords` hashtable near the top of the script
 - Optional Telegram notification on ingest completion (job name, file count, size, duration) — set a bot token + chat ID, leave blank to skip; failures are logged but never abort the ingest

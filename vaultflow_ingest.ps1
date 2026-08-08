@@ -1,5 +1,5 @@
 # ============================================================
-#  ACCUROVA INGEST (Windows)
+#  VAULTFLOW INGEST (Windows)
 #  Camera-agnostic SD card ingest: sort by EXIF date, dedupe,
 #  verify, ready to format. Configure your RAW/video/aux file
 #  extensions in the FILE TYPES section to match your camera.
@@ -10,7 +10,9 @@ Add-Type -AssemblyName System.Drawing
 
 # -- CONFIG FILE ---------------------------------------------
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ConfigFile = Join-Path $ScriptDir "accurova_config.json"
+$ConfigFile = Join-Path $ScriptDir "vaultflow_config.json"
+$IconFile   = Join-Path $ScriptDir "assets\vaultflow.ico"
+$LogoFile   = Join-Path $ScriptDir "assets\vaultflow-icon.png"
 
 function LoadConfig {
     if (Test-Path $ConfigFile) {
@@ -22,6 +24,7 @@ function LoadConfig {
                 Exiftool       = $raw.Exiftool
                 RawExt         = if ($raw.RawExt)   { $raw.RawExt }   else { "nef" }
                 VideoExt       = if ($raw.VideoExt) { $raw.VideoExt } else { "mp4" }
+                AudioExt       = if ($raw.AudioExt) { $raw.AudioExt } else { "wav" }
                 AuxExt         = $raw.AuxExt
                 Copyright      = $raw.Copyright
                 ContactEmail   = $raw.ContactEmail
@@ -37,6 +40,7 @@ function LoadConfig {
         Exiftool       = "C:\exiftool\exiftool.exe"
         RawExt         = "nef"
         VideoExt       = "mp4"
+        AudioExt       = "wav"
         AuxExt         = ""
         Copyright      = ""
         ContactEmail   = ""
@@ -46,13 +50,14 @@ function LoadConfig {
     }
 }
 
-function SaveConfig($dest, $logDir, $exiftool, $rawExt, $videoExt, $auxExt, $copyright, $contactEmail, $website, $telegramToken, $telegramChatId) {
+function SaveConfig($dest, $logDir, $exiftool, $rawExt, $videoExt, $audioExt, $auxExt, $copyright, $contactEmail, $website, $telegramToken, $telegramChatId) {
     @{
         Dest           = $dest
         LogDir         = $logDir
         Exiftool       = $exiftool
         RawExt         = $rawExt
         VideoExt       = $videoExt
+        AudioExt       = $audioExt
         AuxExt         = $auxExt
         Copyright      = $copyright
         ContactEmail   = $contactEmail
@@ -77,9 +82,12 @@ function GetFilesByExt($path, $extList) {
 
 # -- CLIENT FOLDER SCAFFOLD & JOB-TYPE METADATA PRESETS -------
 $ClientFolderTemplate = @(
-    "01_RAW", "02_Catalog", "03_Selects", "04_Photoshop", "05_Exports",
-    "06_Social", "07_Prints", "08_Contracts", "09_Deliverables", "10_Archive"
+    "01_RAW", "02_SELECTS", "03_EDITED", "04_EXPORTS", "05_DELIVERED"
 )
+
+# 01_RAW is split by media type so ingested files land pre-sorted instead of
+# all mixed together in one folder.
+$RawTypeFolders = @("RAW", "JPG", "VIDEO", "AUDIO", "AUX")
 
 # Extra IPTC keywords layered on top per job type. Edit these to taste.
 $JobTypeKeywords = @{
@@ -111,7 +119,7 @@ $FONT_LOG = New-Object System.Drawing.Font("Consolas", 8.5)
 
 # -- FORM ----------------------------------------------------
 $Form = New-Object System.Windows.Forms.Form
-$Form.Text            = "Accurova Ingest"
+$Form.Text            = "VaultFlow Ingest"
 $Form.Size            = New-Object System.Drawing.Size(1140, 1000)
 $Form.StartPosition   = "CenterScreen"
 $Form.BackColor       = $BG
@@ -120,6 +128,9 @@ $Form.Font            = $FONT_UI
 $Form.FormBorderStyle = "FixedSingle"
 $Form.MaximizeBox     = $false
 $Form.ShowInTaskbar   = $true
+if (Test-Path $IconFile) {
+    try { $Form.Icon = New-Object System.Drawing.Icon($IconFile) } catch {}
+}
 
 # -- HELPERS -------------------------------------------------
 function MakeLabel($text, $x, $y, $w = 300) {
@@ -242,11 +253,24 @@ function FormatETA($secs) {
 # ============================================================
 #  TITLE
 # ============================================================
+if (Test-Path $LogoFile) {
+    $LogoBox = New-Object System.Windows.Forms.PictureBox
+    $LogoBox.Image       = [System.Drawing.Image]::FromFile($LogoFile)
+    $LogoBox.SizeMode    = "Zoom"
+    $LogoBox.Location    = New-Object System.Drawing.Point(24, 14)
+    $LogoBox.Size        = New-Object System.Drawing.Size(44, 44)
+    $LogoBox.BackColor   = [System.Drawing.Color]::Transparent
+    $Form.Controls.Add($LogoBox)
+    $TitleX = 76
+} else {
+    $TitleX = 24
+}
+
 $LblTitle = New-Object System.Windows.Forms.Label
-$LblTitle.Text      = "ACCUROVA"
+$LblTitle.Text      = "VAULTFLOW"
 $LblTitle.Font      = $FONT_TTL
 $LblTitle.ForeColor = $TEAL
-$LblTitle.Location  = New-Object System.Drawing.Point(24, 18)
+$LblTitle.Location  = New-Object System.Drawing.Point($TitleX, 18)
 $LblTitle.Size      = New-Object System.Drawing.Size(200, 36)
 $Form.Controls.Add($LblTitle)
 
@@ -254,7 +278,7 @@ $LblSub = New-Object System.Windows.Forms.Label
 $LblSub.Text      = "SD CARD INGEST UTILITY"
 $LblSub.Font      = $FONT_SUB
 $LblSub.ForeColor = $FG_DIM
-$LblSub.Location  = New-Object System.Drawing.Point(26, 52)
+$LblSub.Location  = New-Object System.Drawing.Point(($TitleX + 2), 52)
 $LblSub.Size      = New-Object System.Drawing.Size(200, 18)
 $Form.Controls.Add($LblSub)
 
@@ -317,7 +341,7 @@ $BtnSaveConfig.Add_Click({
     $websiteVal  = if ($TxtWebsite.Text -eq $TxtWebsite.Tag) { "" } else { $TxtWebsite.Text.Trim() }
     $tgTokenVal  = if ($TxtTelegramToken.Text -eq $TxtTelegramToken.Tag) { "" } else { $TxtTelegramToken.Text.Trim() }
     $tgChatIdVal = if ($TxtTelegramChatId.Text -eq $TxtTelegramChatId.Tag) { "" } else { $TxtTelegramChatId.Text.Trim() }
-    SaveConfig $DestBox.TextBox.Text.Trim() $LogBox.TextBox.Text.Trim() $ExifBox.TextBox.Text.Trim() $TxtRawExt.Text.Trim() $TxtVideoExt.Text.Trim() $auxVal $copyVal $contactVal $websiteVal $tgTokenVal $tgChatIdVal
+    SaveConfig $DestBox.TextBox.Text.Trim() $LogBox.TextBox.Text.Trim() $ExifBox.TextBox.Text.Trim() $TxtRawExt.Text.Trim() $TxtVideoExt.Text.Trim() $TxtAudioExt.Text.Trim() $auxVal $copyVal $contactVal $websiteVal $tgTokenVal $tgChatIdVal
     $LblSaveStatus.Text = "Saved."
     $timer = New-Object System.Windows.Forms.Timer
     $timer.Interval = 2000
@@ -332,21 +356,25 @@ AddDivider 314
 # ============================================================
 AddSectionHeader "  FILE TYPES" 324
 
-$Form.Controls.Add((MakeLabel "RAW EXTENSIONS" 24 354 208))
-$TxtRawExt = MakeTextBox 24 372 196 $Config.RawExt
+$Form.Controls.Add((MakeLabel "RAW EXTENSIONS" 24 354 148))
+$TxtRawExt = MakeTextBox 24 372 148 $Config.RawExt
 $Form.Controls.Add($TxtRawExt)
 
-$Form.Controls.Add((MakeLabel "VIDEO EXTENSIONS" 240 354 208))
-$TxtVideoExt = MakeTextBox 240 372 196 $Config.VideoExt
+$Form.Controls.Add((MakeLabel "VIDEO EXTENSIONS" 184 354 148))
+$TxtVideoExt = MakeTextBox 184 372 148 $Config.VideoExt
 $Form.Controls.Add($TxtVideoExt)
 
-$Form.Controls.Add((MakeLabel "AUX EXT. (optional)" 456 354 196))
-$TxtAuxExt = MakePlaceholderTextBox 456 372 196 "e.g. lrv, insv"
+$Form.Controls.Add((MakeLabel "AUDIO EXTENSIONS" 344 354 148))
+$TxtAudioExt = MakeTextBox 344 372 148 $Config.AudioExt
+$Form.Controls.Add($TxtAudioExt)
+
+$Form.Controls.Add((MakeLabel "AUX EXT. (optional)" 504 354 148))
+$TxtAuxExt = MakePlaceholderTextBox 504 372 148 "e.g. lrv, insv"
 if ($Config.AuxExt) { $TxtAuxExt.Text = $Config.AuxExt; $TxtAuxExt.ForeColor = $FG }
 $Form.Controls.Add($TxtAuxExt)
 
 $LblFileTypesHint = New-Object System.Windows.Forms.Label
-$LblFileTypesHint.Text      = "Comma-separated, no dots. RAW example: nef, cr2, cr3, arw, raf, orf, rw2, dng.  AUX = proxy/360 footage, e.g. GoPro/Insta360 .lrv/.insv"
+$LblFileTypesHint.Text      = "Comma-separated, no dots. RAW example: nef, cr2, cr3, arw, raf, orf, rw2, dng.  AUDIO example: wav, mp3.  AUX = proxy/360 footage, e.g. GoPro/Insta360 .lrv/.insv"
 $LblFileTypesHint.Font      = $FONT_SUB
 $LblFileTypesHint.ForeColor = $FG_DIM
 $LblFileTypesHint.Location  = New-Object System.Drawing.Point(24, 402)
@@ -417,9 +445,13 @@ foreach ($jt in @("Wedding", "Corporate", "Event", "Portrait", "Other")) { $CmbJ
 $CmbJobType.SelectedItem = "Other"
 $Form.Controls.Add($CmbJobType)
 
-$Form.Controls.Add((MakeLabel "EVENT NAME" 24 648))
-$TxtEvent = MakePlaceholderTextBox 24 666 400 "e.g. FAF Day 2"
+$Form.Controls.Add((MakeLabel "EVENT NAME" 24 648 300))
+$TxtEvent = MakePlaceholderTextBox 24 666 300 "e.g. FAF Day 2"
 $Form.Controls.Add($TxtEvent)
+
+$Form.Controls.Add((MakeLabel "LOCATION" 340 648 300))
+$TxtLocation = MakePlaceholderTextBox 340 666 300 "e.g. Punggol"
+$Form.Controls.Add($TxtLocation)
 
 $Form.Controls.Add((MakeLabel "SD CARD DRIVE" 24 702))
 $CmbDrive = New-Object System.Windows.Forms.ComboBox
@@ -750,11 +782,10 @@ function IsDuplicateInVault($destIndex, $key, $sourceLength, $sourcePath) {
 }
 
 # -- EXIFTOOL RUNNER -----------------------------------------
-# $subFolder: optional subfolder appended after the date folder (e.g. "360")
+# $subFolder: media-type subfolder under 01_RAW (e.g. "RAW", "VIDEO", "AUDIO", "AUX")
 # $sourceFiles: pre-gathered FileInfo list for this step (e.g. $RawFiles)
-function RunExifStep($sourceFiles, $fileMap, $destIndex, $isDryRun, $dest, $subFolder = "") {
-    $subPart  = if ($subFolder -ne "") { "\$subFolder" } else { "" }
-    $destPattern = "$dest\%Y_%m\%Y-%m-%d$($script:Suffix)\01_RAW$subPart"
+function RunExifStep($sourceFiles, $fileMap, $destIndex, $isDryRun, $dest, $subFolder) {
+    $destPattern = "$dest\%Y_%m\%Y-%m-%d$($script:Suffix)\01_RAW\$subFolder"
 
     if ($isDryRun) {
         foreach ($f in $sourceFiles) {
@@ -933,15 +964,18 @@ function StartIngest($IsDryRun) {
         ResetUI; return
     }
 
-    $ClientVal = $TxtClient.Text.Trim()
-    $EvtVal    = $TxtEvent.Text.Trim()
-    if ($ClientVal -eq $TxtClient.Tag) { $ClientVal = "" }
-    if ($EvtVal -eq $TxtEvent.Tag)     { $EvtVal = "" }
-    # Day-folder name: YYYY-MM-DD[_Client][_Event] - matches the client-facing
-    # naming convention, enforced here instead of typed manually per shoot.
+    $ClientVal   = $TxtClient.Text.Trim()
+    $EvtVal      = $TxtEvent.Text.Trim()
+    $LocationVal = $TxtLocation.Text.Trim()
+    if ($ClientVal -eq $TxtClient.Tag)     { $ClientVal = "" }
+    if ($EvtVal -eq $TxtEvent.Tag)         { $EvtVal = "" }
+    if ($LocationVal -eq $TxtLocation.Tag) { $LocationVal = "" }
+    # Day-folder name: YYYY-MM-DD[_Client][_Event][_Location] - matches the
+    # client-facing naming convention, enforced here instead of typed manually per shoot.
     $script:Suffix = ""
-    if ($ClientVal -ne "") { $script:Suffix += "_$ClientVal" }
-    if ($EvtVal -ne "")    { $script:Suffix += "_$EvtVal" }
+    if ($ClientVal -ne "")   { $script:Suffix += "_$ClientVal" }
+    if ($EvtVal -ne "")      { $script:Suffix += "_$EvtVal" }
+    if ($LocationVal -ne "") { $script:Suffix += "_$LocationVal" }
     $script:Suffix = $script:Suffix -replace '[\\/:*?"<>|]', '-'
 
     $JobTypeVal  = $CmbJobType.SelectedItem.ToString()
@@ -958,6 +992,7 @@ function StartIngest($IsDryRun) {
 
     $RawExtList   = ParseExtList $TxtRawExt.Text.Trim()
     $VideoExtList = ParseExtList $TxtVideoExt.Text.Trim()
+    $AudioExtList = ParseExtList $TxtAudioExt.Text.Trim()
     $AuxRaw       = if ($TxtAuxExt.Text -eq $TxtAuxExt.Tag) { "" } else { $TxtAuxExt.Text.Trim() }
     $AuxExtList   = ParseExtList $AuxRaw
 
@@ -981,29 +1016,35 @@ function StartIngest($IsDryRun) {
 
     $RawFiles   = GetFilesByExt $SD_CARD $RawExtList
     $VideoFiles = GetFilesByExt $SD_CARD $VideoExtList
+    $AudioFiles = GetFilesByExt $SD_CARD $AudioExtList
     $AuxFiles   = GetFilesByExt $SD_CARD $AuxExtList
     $JpgFiles   = @(Get-ChildItem -Path $SD_CARD -Recurse -Include "*.jpg","*.jpeg" -ErrorAction SilentlyContinue)
 
     $FileMap = @{}
-    foreach ($f in ($RawFiles + $VideoFiles + $AuxFiles + $JpgFiles)) {
+    foreach ($f in ($RawFiles + $VideoFiles + $AudioFiles + $AuxFiles + $JpgFiles)) {
         $key = [System.IO.Path]::GetFileNameWithoutExtension($f.Name).ToLower()
         if (-not $FileMap.ContainsKey($key)) { $FileMap[$key] = $f }
     }
 
     $TotalRawBytes   = ($RawFiles   | Measure-Object -Property Length -Sum).Sum
     $TotalVideoBytes = ($VideoFiles | Measure-Object -Property Length -Sum).Sum
+    $TotalAudioBytes = ($AudioFiles | Measure-Object -Property Length -Sum).Sum
     $TotalAuxBytes   = ($AuxFiles   | Measure-Object -Property Length -Sum).Sum
     if (-not $TotalRawBytes)   { $TotalRawBytes   = 0 }
     if (-not $TotalVideoBytes) { $TotalVideoBytes = 0 }
+    if (-not $TotalAudioBytes) { $TotalAudioBytes = 0 }
     if (-not $TotalAuxBytes)   { $TotalAuxBytes   = 0 }
-    $TotalTransferBytes = $TotalRawBytes + $TotalVideoBytes + $TotalAuxBytes
-    $script:TotalFiles  = $RawFiles.Count + $VideoFiles.Count + $AuxFiles.Count
+    $TotalTransferBytes = $TotalRawBytes + $TotalVideoBytes + $TotalAudioBytes + $TotalAuxBytes
+    $script:TotalFiles  = $RawFiles.Count + $VideoFiles.Count + $AudioFiles.Count + $AuxFiles.Count
     $script:TotalBytes  = $TotalTransferBytes
     $script:FilesDone   = 0
     $script:BytesDone   = 0
 
     AppendLog "[INFO]  Found $($RawFiles.Count) RAW files   ($(FormatBytes $TotalRawBytes))" $FG
     AppendLog "[INFO]  Found $($VideoFiles.Count) video files   ($(FormatBytes $TotalVideoBytes))" $FG
+    if ($AudioExtList.Count -gt 0) {
+        AppendLog "[INFO]  Found $($AudioFiles.Count) audio files ($($AudioExtList -join '/'))  ($(FormatBytes $TotalAudioBytes))" $FG
+    }
     if ($AuxExtList.Count -gt 0) {
         AppendLog "[INFO]  Found $($AuxFiles.Count) aux files ($($AuxExtList -join '/'))  ($(FormatBytes $TotalAuxBytes))" $FG
     }
@@ -1015,7 +1056,7 @@ function StartIngest($IsDryRun) {
     $DestIndex = BuildDestIndex $DEST_LIVE
     AppendLog "[INFO]  Vault index: $($DestIndex.Count) existing files." $FG
     $dupCount = 0
-    foreach ($f in ($RawFiles + $VideoFiles)) {
+    foreach ($f in ($RawFiles + $VideoFiles + $AudioFiles)) {
         if (IsDuplicateInVault $DestIndex $f.Name.ToLower() $f.Length $f.FullName) { $dupCount++ }
     }
     if ($dupCount -gt 0) {
@@ -1038,7 +1079,7 @@ function StartIngest($IsDryRun) {
             $LblStatus.Text = "Insufficient storage!"
             $dlgResult = [System.Windows.Forms.MessageBox]::Show(
                 "Not enough space on $DestDrive.`n`nRequired : $needed`nAvailable: $avail`n`nContinue anyway?",
-                "Accurova - Storage Warning",
+                "VaultFlow - Storage Warning",
                 [System.Windows.Forms.MessageBoxButtons]::OKCancel,
                 [System.Windows.Forms.MessageBoxIcon]::Warning
             )
@@ -1060,15 +1101,16 @@ function StartIngest($IsDryRun) {
     $modeLabel          = if ($IsDryRun) { "DRY RUN" } else { "LIVE" }
 
     AppendLog "`n============================================" $TEAL
-    AppendLog " ACCUROVA  [$modeLabel]  -  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" $TEAL
+    AppendLog " VAULTFLOW  [$modeLabel]  -  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" $TEAL
     AppendLog " Source : $SD_CARD" $FG
-    AppendLog " Dest   : $DEST_LIVE\{YYYY_MM}\{YYYY-MM-DD}$($script:Suffix)\01_RAW" $FG
+    AppendLog " Dest   : $DEST_LIVE\{YYYY_MM}\{YYYY-MM-DD}$($script:Suffix)\01_RAW\{RAW|JPG|VIDEO|AUDIO|AUX}" $FG
     AppendLog "============================================" $TEAL
 
     foreach ($step in @(
-        @{ Label="RAW files"; Files=$RawFiles; Bytes=$TotalRawBytes; Sub="" },
-        @{ Label="video files"; Files=$VideoFiles; Bytes=$TotalVideoBytes; Sub="" },
-        @{ Label="aux files"; Files=$AuxFiles; Bytes=$TotalAuxBytes; Sub="aux" }
+        @{ Label="RAW files"; Files=$RawFiles; Bytes=$TotalRawBytes; Sub="RAW" },
+        @{ Label="video files"; Files=$VideoFiles; Bytes=$TotalVideoBytes; Sub="VIDEO" },
+        @{ Label="audio files"; Files=$AudioFiles; Bytes=$TotalAudioBytes; Sub="AUDIO" },
+        @{ Label="aux files"; Files=$AuxFiles; Bytes=$TotalAuxBytes; Sub="AUX" }
     )) {
         if ($step.Files.Count -eq 0) {
             AppendLog "`n[INFO]  No $($step.Label) found - skipping." $FG_DIM
@@ -1095,7 +1137,7 @@ function StartIngest($IsDryRun) {
             } else {
                 AppendLog "[WARN]  Orphan JPG (no matching RAW file): $($Jpg.Name)" $YELLOW
                 if (-not $IsDryRun) {
-                    $argStr = "-d `"$DEST_LIVE\%Y_%m\%Y-%m-%d$($script:Suffix)\01_RAW`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" $($script:MetadataArgs) -o `".`" --overwrite_original `"$($Jpg.FullName)`""
+                    $argStr = "-d `"$DEST_LIVE\%Y_%m\%Y-%m-%d$($script:Suffix)\01_RAW\JPG`" `"-Directory<DateTimeOriginal`" `"-Directory<CreateDate`" `"-Directory<FileModifyDate`" $($script:MetadataArgs) -o `".`" --overwrite_original `"$($Jpg.FullName)`""
                     $psi2 = New-Object System.Diagnostics.ProcessStartInfo
                     $psi2.FileName = $EXIFTOOL_LIVE; $psi2.Arguments = $argStr
                     $psi2.RedirectStandardOutput = $true; $psi2.UseShellExecute = $false; $psi2.CreateNoWindow = $true
@@ -1109,12 +1151,13 @@ function StartIngest($IsDryRun) {
     else { AppendLog "[WARN]  $OrphanCount orphan JPG(s) $(if ($IsDryRun) { 'would be copied' } else { 'copied' })." $YELLOW }
 
     # -- CLIENT FOLDER SCAFFOLD -----------------------------------
-    # Ensures every day folder under the vault has the full 10-folder
-    # client structure (01_RAW..10_Archive), not just the ones ExifTool
-    # happened to create while copying RAW/video files.
+    # Ensures every day folder under the vault has the full 5-folder
+    # client structure (01_RAW..05_DELIVERED), not just the ones ExifTool
+    # happened to create while copying RAW/video files. 01_RAW itself is
+    # further split by media type (RAW/JPG/VIDEO/AUDIO/AUX).
     $LblStatus.Text = "Building client folder structure..."
     if ($IsDryRun) {
-        AppendLog "`n[INFO]  Would create client folder structure ($($ClientFolderTemplate -join ', ')) in touched day folder(s)." $FG_DIM
+        AppendLog "`n[INFO]  Would create client folder structure ($($ClientFolderTemplate -join ', ')) in touched day folder(s), with 01_RAW split into $($RawTypeFolders -join ', ')." $FG_DIM
     } else {
         $ScaffoldCount = 0
         foreach ($MonthFolder in (Get-ChildItem -Path $DEST_LIVE -Directory -ErrorAction SilentlyContinue)) {
@@ -1123,6 +1166,9 @@ function StartIngest($IsDryRun) {
             foreach ($DayFolder in $DayFolders) {
                 foreach ($SubFolder in $ClientFolderTemplate) {
                     New-Item -ItemType Directory -Force -Path (Join-Path $DayFolder.FullName $SubFolder) | Out-Null
+                }
+                foreach ($RawSubFolder in $RawTypeFolders) {
+                    New-Item -ItemType Directory -Force -Path (Join-Path $DayFolder.FullName "01_RAW\$RawSubFolder") | Out-Null
                 }
                 $ScaffoldCount++
             }
@@ -1136,7 +1182,7 @@ function StartIngest($IsDryRun) {
     $LblPct.Text         = "100%"
     $LblCurrentFile.Text = ""
     $LblStatus.Text      = "Verifying..."
-    VerifyIngest ($RawFiles + $VideoFiles + $AuxFiles) $DEST_LIVE $IsDryRun
+    VerifyIngest ($RawFiles + $VideoFiles + $AudioFiles + $AuxFiles) $DEST_LIVE $IsDryRun
 
     $elapsed    = [DateTime]::Now - $script:IngestStart
     $elapsedStr = "{0}m {1}s" -f [int]$elapsed.TotalMinutes, $elapsed.Seconds
@@ -1146,6 +1192,7 @@ function StartIngest($IsDryRun) {
     AppendLog "  Mode        : $modeLabel" $(if ($IsDryRun) { $YELLOW } else { $GREEN })
     AppendLog "  RAW files   : $($RawFiles.Count)  ($(FormatBytes $TotalRawBytes))" $FG
     AppendLog "  Video files : $($VideoFiles.Count)  ($(FormatBytes $TotalVideoBytes))" $FG
+    AppendLog "  Audio files : $($AudioFiles.Count)  ($(FormatBytes $TotalAudioBytes))" $FG
     AppendLog "  Aux files   : $($AuxFiles.Count)  ($(FormatBytes $TotalAuxBytes))" $FG
     AppendLog "  Duplicates  : $dupCount skipped" $(if ($dupCount -gt 0) { $ORANGE } else { $FG })
     AppendLog "  Orphan JPGs : $OrphanCount" $FG
@@ -1174,10 +1221,10 @@ function StartIngest($IsDryRun) {
         $tgToken  = if ($TxtTelegramToken.Text -eq $TxtTelegramToken.Tag) { "" } else { $TxtTelegramToken.Text.Trim() }
         $tgChatId = if ($TxtTelegramChatId.Text -eq $TxtTelegramChatId.Tag) { "" } else { $TxtTelegramChatId.Text.Trim() }
         if ($tgToken -ne "" -and $tgChatId -ne "") {
-            $jobLabel = @($ClientVal, $EvtVal) | Where-Object { $_ -ne "" }
+            $jobLabel = @($ClientVal, $EvtVal, $LocationVal) | Where-Object { $_ -ne "" }
             $jobLabel = if ($jobLabel.Count -gt 0) { $jobLabel -join " - " } else { "Untitled job" }
-            $totalFiles = $RawFiles.Count + $VideoFiles.Count + $AuxFiles.Count
-            $tgMessage = "Accurova Ingest complete - $jobLabel`n$totalFiles files, $(FormatBytes $TotalTransferBytes), ${elapsedStr}."
+            $totalFiles = $RawFiles.Count + $VideoFiles.Count + $AudioFiles.Count + $AuxFiles.Count
+            $tgMessage = "VaultFlow Ingest complete - $jobLabel`n$totalFiles files, $(FormatBytes $TotalTransferBytes), ${elapsedStr}."
             SendTelegramNotification $tgToken $tgChatId $tgMessage
         }
     }
@@ -1200,7 +1247,7 @@ try {
 } catch {
     [System.Windows.Forms.MessageBox]::Show(
         "Startup error:`n`n$($_.Exception.Message)`n`nLine: $($_.InvocationInfo.ScriptLineNumber)",
-        "Accurova - Error",
+        "VaultFlow - Error",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
     )

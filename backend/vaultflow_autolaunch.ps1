@@ -1,5 +1,5 @@
 # ============================================================
-#  ACCUROVA AUTOLAUNCH
+#  VAULTFLOW AUTOLAUNCH
 #  Fired by a Task Scheduler event trigger when Windows detects
 #  a new device (see README "Auto-launch on SD card insert").
 #  Checks whether the new drive looks like a camera SD card
@@ -8,7 +8,7 @@
 # ============================================================
 
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$IngestPath = Join-Path $ScriptDir "accurova_ingest.ps1"
+$IngestPath = Join-Path $ScriptDir "..\vaultflow_ingest.ps1"
 
 function DetectSDCard {
     foreach ($drive in [System.IO.DriveInfo]::GetDrives()) {
@@ -24,7 +24,7 @@ function DetectSDCard {
 if (-not (DetectSDCard)) { exit }
 
 $AlreadyRunning = Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -and $_.CommandLine -like "*accurova_ingest.ps1*" }
+    Where-Object { $_.CommandLine -and $_.CommandLine -like "*vaultflow_ingest.ps1*" }
 
 if ($AlreadyRunning) { exit }
 

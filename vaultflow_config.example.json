@@ -4,6 +4,7 @@
     "Exiftool":       "C:\\exiftool\\exiftool.exe",
     "RawExt":         "nef, cr2, cr3, arw, raf, orf, rw2, dng",
     "VideoExt":       "mp4, mov",
+    "AudioExt":       "wav, mp3",
     "AuxExt":         "lrv, insv",
     "Copyright":      "(c) 2026 Jane Doe",
     "ContactEmail":   "you@example.com",

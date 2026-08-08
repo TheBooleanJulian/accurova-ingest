@@ -1,6 +1,6 @@
 # Commercial Licensing
 
-Accurova Ingest is dual licensed. The code in this repository is available under the [GNU Affero General Public License v3 (AGPLv3)](LICENSE), free of charge, for anyone willing to comply with its terms.
+VaultFlow Ingest is dual licensed. The code in this repository is available under the [GNU Affero General Public License v3 (AGPLv3)](LICENSE), free of charge, for anyone willing to comply with its terms.
 
 If your organization wants to:
 
@@ -20,4 +20,4 @@ a separate commercial license is available. Because the copyright holder (TheBoo
 ## What doesn't change
 
 - The AGPLv3 track stays free and open for the community regardless of the commercial track existing.
-- A commercial license does not grant trademark rights to the Accurova name or branding.
+- A commercial license does not grant trademark rights to the VaultFlow name or branding.
