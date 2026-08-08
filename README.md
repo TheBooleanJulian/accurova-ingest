@@ -6,7 +6,7 @@
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
 
-![Version](https://img.shields.io/badge/version-5.0.0-00D4C8)
+![Version](https://img.shields.io/badge/version-0.9.0-00D4C8)
 ![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
 
@@ -122,11 +122,13 @@ vaultflow-ingest/
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`):
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`), staying in the `0.x` range while it has a single known user and no compatibility contract to keep:
 
-- **MAJOR** — breaking changes to config format, folder structure, or workflow that require user action
-- **MINOR** — new features that are backward compatible (new toggles, new file types, new UI sections)
-- **PATCH** — bug fixes and small tweaks with no behavior change for existing users
+- **MAJOR** stays `0` until there's a reason to promise stability to other users
+- **MINOR** — breaking changes to config format, folder structure, or workflow (what would've been a MAJOR bump post-1.0), as well as new backward-compatible features
+- **PATCH** — bug fixes and small tweaks with no behavior change
+
+As of 2026-08-09, versioning switches to `0.x` (see changelog), picking back up at `0.9.0` — the next number after `0.8.0`, the last version before this repo's git history started — so the numbering stays continuous and non-repeating even though `1.0.0`–`5.0.0` sit in between chronologically. Those remain in the changelog below as accurate history; they just predate this policy.
 
 ## Status / Roadmap
 
@@ -169,8 +171,9 @@ Suggestions and feedback welcome — open an issue or reach out directly.
 
 All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
 
-### [5.0.0] - 2026-08-09
-- **Breaking:** **Location** field restored to the **SESSION** section (dropped in 2.0.0); day-folder naming is now `YYYY-MM-DD_ClientName_EventName_Location` — existing vault folders are unaffected, new ingests append Location as a fourth optional segment
+### [0.9.0] - 2026-08-09
+- Versioning switches to `0.x` — with a single known user and no compatibility contract to keep, MAJOR bumps for every folder/config-breaking tweak (2.0.0 → 5.0.0 in one day) added ceremony without adding information; see **Versioning** above for the new scheme and why numbering resumes at `0.9.0` instead of restarting from `0.1.0`
+- **Location** field restored to the **SESSION** section (dropped in 2.0.0); day-folder naming is now `YYYY-MM-DD_ClientName_EventName_Location` — existing vault folders are unaffected, new ingests append Location as a fourth optional segment
 
 ### [4.0.0] - 2026-08-09
 - **Breaking:** `01_RAW` is now split into `RAW` / `JPG` / `VIDEO` / `AUDIO` / `AUX` subfolders by media type instead of landing everything in `01_RAW` directly (aux previously nested in `01_RAW\aux`); existing vault folders are unaffected, new ingests use the subfoldered layout
