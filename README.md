@@ -6,7 +6,7 @@
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
 
-![Version](https://img.shields.io/badge/version-4.0.0-00D4C8)
+![Version](https://img.shields.io/badge/version-5.0.0-00D4C8)
 ![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
 
@@ -21,7 +21,7 @@ VaultFlow Ingest is a Windows PowerShell GUI utility for photographers and video
 Each ingest creates a full client-ready folder structure, with `01_RAW` itself pre-sorted by media type:
 
 ```
-Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
+Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName_Location\
   |-- 01_RAW
   |   |-- RAW        <- RAW files (nef, cr2, arw, ...)
   |   |-- JPG         <- orphan JPGs with no matching RAW file
@@ -40,7 +40,7 @@ Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
 - Camera-agnostic file typing — configure your own RAW / video / audio / auxiliary (proxy, 360 footage, etc.) extensions instead of a hardcoded list
 - `01_RAW` pre-sorted by media type into `RAW` / `JPG` / `VIDEO` / `AUDIO` / `AUX` subfolders as files are ingested, instead of landing mixed together
 - Creates the full 5-folder client structure (`01_RAW` … `05_DELIVERED`) under every day folder touched by the ingest, not just where files land
-- Client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName`) enforced automatically instead of typed free-text per shoot
+- Client-facing day-folder naming (`YYYY-MM-DD_ClientName_EventName_Location`) enforced automatically instead of typed free-text per shoot
 - Embeds Copyright, Credit (website), Source (contact), and job-type keywords into every ingested file via ExifTool — set once in **Metadata**, applied every run
 - Job Type dropdown (Wedding / Corporate / Event / Portrait / Other) layers extra keywords on top of your base metadata
 - Duplicate detection against the existing vault before copying, confirmed by checksum (not just filename/size) so recycled camera file-counters don't produce false positives
@@ -68,7 +68,7 @@ Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
 3. Set your **Vault Destination**, **Log Folder**, and **ExifTool Path** under Paths (e.g. `D:\Photos\Vault`, `D:\Photos\Vault\_logs`, `C:\exiftool\exiftool.exe`), then click **Save Paths**.
 4. Under **File Types**, set your camera's extensions — e.g. **RAW**: `nef` (Nikon), `cr2, cr3` (Canon), `arw` (Sony), `raf` (Fujifilm); **Video**: `mp4, mov`; **Audio**: `wav, mp3`; **Aux** (optional): `lrv, insv` for GoPro/Insta360 proxy or 360 footage.
 5. Under **Metadata / Notifications**, set your **Copyright**, **Contact Email**, and **Website** — written into every ingested file's metadata. Optionally add a **Telegram Bot Token** and **Chat ID** to get a message when ingest finishes.
-6. Enter a **Client Name** and pick a **Job Type**; optionally an **Event Name** too — these build the day folder's name (`YYYY-MM-DD_ClientName_EventName`) and select which extra keywords get embedded.
+6. Enter a **Client Name** and pick a **Job Type**; optionally an **Event Name** and/or **Location** too — these build the day folder's name (`YYYY-MM-DD_ClientName_EventName_Location`) and select which extra keywords get embedded.
 7. Confirm the detected **SD Card Drive** (or pick manually).
 8. Toggle **Eject SD card after ingest** if wanted.
 9. Click **START DRY RUN** to preview without copying, or **START LIVE INGEST** to actually copy.
@@ -168,6 +168,9 @@ Suggestions and feedback welcome — open an issue or reach out directly.
 ## Changelog
 
 All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
+
+### [5.0.0] - 2026-08-09
+- **Breaking:** **Location** field restored to the **SESSION** section (dropped in 2.0.0); day-folder naming is now `YYYY-MM-DD_ClientName_EventName_Location` — existing vault folders are unaffected, new ingests append Location as a fourth optional segment
 
 ### [4.0.0] - 2026-08-09
 - **Breaking:** `01_RAW` is now split into `RAW` / `JPG` / `VIDEO` / `AUDIO` / `AUX` subfolders by media type instead of landing everything in `01_RAW` directly (aux previously nested in `01_RAW\aux`); existing vault folders are unaffected, new ingests use the subfoldered layout

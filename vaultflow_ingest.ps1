@@ -445,9 +445,13 @@ foreach ($jt in @("Wedding", "Corporate", "Event", "Portrait", "Other")) { $CmbJ
 $CmbJobType.SelectedItem = "Other"
 $Form.Controls.Add($CmbJobType)
 
-$Form.Controls.Add((MakeLabel "EVENT NAME" 24 648))
-$TxtEvent = MakePlaceholderTextBox 24 666 400 "e.g. FAF Day 2"
+$Form.Controls.Add((MakeLabel "EVENT NAME" 24 648 300))
+$TxtEvent = MakePlaceholderTextBox 24 666 300 "e.g. FAF Day 2"
 $Form.Controls.Add($TxtEvent)
+
+$Form.Controls.Add((MakeLabel "LOCATION" 340 648 300))
+$TxtLocation = MakePlaceholderTextBox 340 666 300 "e.g. Punggol"
+$Form.Controls.Add($TxtLocation)
 
 $Form.Controls.Add((MakeLabel "SD CARD DRIVE" 24 702))
 $CmbDrive = New-Object System.Windows.Forms.ComboBox
@@ -960,15 +964,18 @@ function StartIngest($IsDryRun) {
         ResetUI; return
     }
 
-    $ClientVal = $TxtClient.Text.Trim()
-    $EvtVal    = $TxtEvent.Text.Trim()
-    if ($ClientVal -eq $TxtClient.Tag) { $ClientVal = "" }
-    if ($EvtVal -eq $TxtEvent.Tag)     { $EvtVal = "" }
-    # Day-folder name: YYYY-MM-DD[_Client][_Event] - matches the client-facing
-    # naming convention, enforced here instead of typed manually per shoot.
+    $ClientVal   = $TxtClient.Text.Trim()
+    $EvtVal      = $TxtEvent.Text.Trim()
+    $LocationVal = $TxtLocation.Text.Trim()
+    if ($ClientVal -eq $TxtClient.Tag)     { $ClientVal = "" }
+    if ($EvtVal -eq $TxtEvent.Tag)         { $EvtVal = "" }
+    if ($LocationVal -eq $TxtLocation.Tag) { $LocationVal = "" }
+    # Day-folder name: YYYY-MM-DD[_Client][_Event][_Location] - matches the
+    # client-facing naming convention, enforced here instead of typed manually per shoot.
     $script:Suffix = ""
-    if ($ClientVal -ne "") { $script:Suffix += "_$ClientVal" }
-    if ($EvtVal -ne "")    { $script:Suffix += "_$EvtVal" }
+    if ($ClientVal -ne "")   { $script:Suffix += "_$ClientVal" }
+    if ($EvtVal -ne "")      { $script:Suffix += "_$EvtVal" }
+    if ($LocationVal -ne "") { $script:Suffix += "_$LocationVal" }
     $script:Suffix = $script:Suffix -replace '[\\/:*?"<>|]', '-'
 
     $JobTypeVal  = $CmbJobType.SelectedItem.ToString()
@@ -1214,7 +1221,7 @@ function StartIngest($IsDryRun) {
         $tgToken  = if ($TxtTelegramToken.Text -eq $TxtTelegramToken.Tag) { "" } else { $TxtTelegramToken.Text.Trim() }
         $tgChatId = if ($TxtTelegramChatId.Text -eq $TxtTelegramChatId.Tag) { "" } else { $TxtTelegramChatId.Text.Trim() }
         if ($tgToken -ne "" -and $tgChatId -ne "") {
-            $jobLabel = @($ClientVal, $EvtVal) | Where-Object { $_ -ne "" }
+            $jobLabel = @($ClientVal, $EvtVal, $LocationVal) | Where-Object { $_ -ne "" }
             $jobLabel = if ($jobLabel.Count -gt 0) { $jobLabel -join " - " } else { "Untitled job" }
             $totalFiles = $RawFiles.Count + $VideoFiles.Count + $AudioFiles.Count + $AuxFiles.Count
             $tgMessage = "VaultFlow Ingest complete - $jobLabel`n$totalFiles files, $(FormatBytes $TotalTransferBytes), ${elapsedStr}."
