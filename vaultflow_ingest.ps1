@@ -11,6 +11,8 @@ Add-Type -AssemblyName System.Drawing
 # -- CONFIG FILE ---------------------------------------------
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ConfigFile = Join-Path $ScriptDir "vaultflow_config.json"
+$IconFile   = Join-Path $ScriptDir "assets\vaultflow.ico"
+$LogoFile   = Join-Path $ScriptDir "assets\vaultflow-icon.png"
 
 function LoadConfig {
     if (Test-Path $ConfigFile) {
@@ -119,6 +121,9 @@ $Form.Font            = $FONT_UI
 $Form.FormBorderStyle = "FixedSingle"
 $Form.MaximizeBox     = $false
 $Form.ShowInTaskbar   = $true
+if (Test-Path $IconFile) {
+    try { $Form.Icon = New-Object System.Drawing.Icon($IconFile) } catch {}
+}
 
 # -- HELPERS -------------------------------------------------
 function MakeLabel($text, $x, $y, $w = 300) {
@@ -241,11 +246,24 @@ function FormatETA($secs) {
 # ============================================================
 #  TITLE
 # ============================================================
+if (Test-Path $LogoFile) {
+    $LogoBox = New-Object System.Windows.Forms.PictureBox
+    $LogoBox.Image       = [System.Drawing.Image]::FromFile($LogoFile)
+    $LogoBox.SizeMode    = "Zoom"
+    $LogoBox.Location    = New-Object System.Drawing.Point(24, 14)
+    $LogoBox.Size        = New-Object System.Drawing.Size(44, 44)
+    $LogoBox.BackColor   = [System.Drawing.Color]::Transparent
+    $Form.Controls.Add($LogoBox)
+    $TitleX = 76
+} else {
+    $TitleX = 24
+}
+
 $LblTitle = New-Object System.Windows.Forms.Label
 $LblTitle.Text      = "VAULTFLOW"
 $LblTitle.Font      = $FONT_TTL
 $LblTitle.ForeColor = $TEAL
-$LblTitle.Location  = New-Object System.Drawing.Point(24, 18)
+$LblTitle.Location  = New-Object System.Drawing.Point($TitleX, 18)
 $LblTitle.Size      = New-Object System.Drawing.Size(200, 36)
 $Form.Controls.Add($LblTitle)
 
@@ -253,7 +271,7 @@ $LblSub = New-Object System.Windows.Forms.Label
 $LblSub.Text      = "SD CARD INGEST UTILITY"
 $LblSub.Font      = $FONT_SUB
 $LblSub.ForeColor = $FG_DIM
-$LblSub.Location  = New-Object System.Drawing.Point(26, 52)
+$LblSub.Location  = New-Object System.Drawing.Point(($TitleX + 2), 52)
 $LblSub.Size      = New-Object System.Drawing.Size(200, 18)
 $Form.Controls.Add($LblSub)
 

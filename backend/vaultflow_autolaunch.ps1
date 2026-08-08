@@ -8,7 +8,7 @@
 # ============================================================
 
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$IngestPath = Join-Path $ScriptDir "vaultflow_ingest.ps1"
+$IngestPath = Join-Path $ScriptDir "..\vaultflow_ingest.ps1"
 
 function DetectSDCard {
     foreach ($drive in [System.IO.DriveInfo]::GetDrives()) {

@@ -1,5 +1,7 @@
 <div align="center">
 
+![VaultFlow](assets/vaultflow-logo.png)
+
 # VaultFlow Ingest
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
@@ -43,7 +45,7 @@ Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
 - Post-ingest verification (source vs. destination file and byte counts)
 - Optional SD card eject on completion
 - Optional Telegram notification on ingest completion (job name, file count, size, duration) — set a bot token + chat ID in **Metadata / Notifications**, leave blank to skip
-- Optional auto-launch on SD card insertion (Task Scheduler event trigger — see `vaultflow_register_autolaunch.ps1`)
+- Optional auto-launch on SD card insertion (Task Scheduler event trigger — see `backend/vaultflow_register_autolaunch.ps1`)
 - Persisted config (`vaultflow_config.json`) for vault path, log folder, ExifTool path, file extensions, and metadata/notification defaults
 
 ## Tech Stack
@@ -67,7 +69,7 @@ Dest\YYYY_MM\YYYY-MM-DD_ClientName_EventName\
 
 ### Optional: auto-launch on SD card insert
 
-Run `vaultflow_register_autolaunch.ps1` once from an elevated (Administrator) PowerShell. It registers a Scheduled Task that fires `vaultflow_autolaunch.ps1` whenever Windows detects a new device; that script checks for a DCIM-bearing removable drive and pops the GUI up automatically if one is found (no-ops otherwise, and no-ops if the app is already running).
+Run `backend\vaultflow_register_autolaunch.ps1` once from an elevated (Administrator) PowerShell. It registers a Scheduled Task that fires `backend\vaultflow_autolaunch.ps1` whenever Windows detects a new device; that script checks for a DCIM-bearing removable drive and pops the GUI up automatically if one is found (no-ops otherwise, and no-ops if the app is already running).
 
 ## Requirements
 
@@ -99,10 +101,13 @@ Job Type and its keyword presets (Wedding/Corporate/Event/Portrait/Other) aren't
 
 ```
 vaultflow-ingest/
-|-- vaultflow_ingest.ps1
-|-- vaultflow_autolaunch.ps1
-|-- vaultflow_register_autolaunch.ps1
+|-- vaultflow_ingest.ps1          <- run this
 |-- vaultflow_config.example.json
+|-- backend/
+|   |-- vaultflow_autolaunch.ps1
+|   `-- vaultflow_register_autolaunch.ps1
+|-- assets/
+|   `-- vaultflow-logo.png
 |-- LICENSE
 |-- COMMERCIAL-LICENSE.md
 `-- README.md
