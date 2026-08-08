@@ -1,5 +1,5 @@
 # ============================================================
-#  ACCUROVA INGEST (Windows)
+#  VAULTFLOW INGEST (Windows)
 #  Camera-agnostic SD card ingest: sort by EXIF date, dedupe,
 #  verify, ready to format. Configure your RAW/video/aux file
 #  extensions in the FILE TYPES section to match your camera.
@@ -10,7 +10,7 @@ Add-Type -AssemblyName System.Drawing
 
 # -- CONFIG FILE ---------------------------------------------
 $ScriptDir  = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ConfigFile = Join-Path $ScriptDir "accurova_config.json"
+$ConfigFile = Join-Path $ScriptDir "vaultflow_config.json"
 
 function LoadConfig {
     if (Test-Path $ConfigFile) {
@@ -77,8 +77,7 @@ function GetFilesByExt($path, $extList) {
 
 # -- CLIENT FOLDER SCAFFOLD & JOB-TYPE METADATA PRESETS -------
 $ClientFolderTemplate = @(
-    "01_RAW", "02_Catalog", "03_Selects", "04_Photoshop", "05_Exports",
-    "06_Social", "07_Prints", "08_Contracts", "09_Deliverables", "10_Archive"
+    "01_RAW", "02_SELECTS", "03_EDITED", "04_EXPORTS", "05_DELIVERED"
 )
 
 # Extra IPTC keywords layered on top per job type. Edit these to taste.
@@ -111,7 +110,7 @@ $FONT_LOG = New-Object System.Drawing.Font("Consolas", 8.5)
 
 # -- FORM ----------------------------------------------------
 $Form = New-Object System.Windows.Forms.Form
-$Form.Text            = "Accurova Ingest"
+$Form.Text            = "VaultFlow Ingest"
 $Form.Size            = New-Object System.Drawing.Size(1140, 1000)
 $Form.StartPosition   = "CenterScreen"
 $Form.BackColor       = $BG
@@ -243,7 +242,7 @@ function FormatETA($secs) {
 #  TITLE
 # ============================================================
 $LblTitle = New-Object System.Windows.Forms.Label
-$LblTitle.Text      = "ACCUROVA"
+$LblTitle.Text      = "VAULTFLOW"
 $LblTitle.Font      = $FONT_TTL
 $LblTitle.ForeColor = $TEAL
 $LblTitle.Location  = New-Object System.Drawing.Point(24, 18)
@@ -1038,7 +1037,7 @@ function StartIngest($IsDryRun) {
             $LblStatus.Text = "Insufficient storage!"
             $dlgResult = [System.Windows.Forms.MessageBox]::Show(
                 "Not enough space on $DestDrive.`n`nRequired : $needed`nAvailable: $avail`n`nContinue anyway?",
-                "Accurova - Storage Warning",
+                "VaultFlow - Storage Warning",
                 [System.Windows.Forms.MessageBoxButtons]::OKCancel,
                 [System.Windows.Forms.MessageBoxIcon]::Warning
             )
@@ -1060,7 +1059,7 @@ function StartIngest($IsDryRun) {
     $modeLabel          = if ($IsDryRun) { "DRY RUN" } else { "LIVE" }
 
     AppendLog "`n============================================" $TEAL
-    AppendLog " ACCUROVA  [$modeLabel]  -  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" $TEAL
+    AppendLog " VAULTFLOW  [$modeLabel]  -  $(Get-Date -Format 'yyyy-MM-dd HH:mm')" $TEAL
     AppendLog " Source : $SD_CARD" $FG
     AppendLog " Dest   : $DEST_LIVE\{YYYY_MM}\{YYYY-MM-DD}$($script:Suffix)\01_RAW" $FG
     AppendLog "============================================" $TEAL
@@ -1109,8 +1108,8 @@ function StartIngest($IsDryRun) {
     else { AppendLog "[WARN]  $OrphanCount orphan JPG(s) $(if ($IsDryRun) { 'would be copied' } else { 'copied' })." $YELLOW }
 
     # -- CLIENT FOLDER SCAFFOLD -----------------------------------
-    # Ensures every day folder under the vault has the full 10-folder
-    # client structure (01_RAW..10_Archive), not just the ones ExifTool
+    # Ensures every day folder under the vault has the full 5-folder
+    # client structure (01_RAW..05_DELIVERED), not just the ones ExifTool
     # happened to create while copying RAW/video files.
     $LblStatus.Text = "Building client folder structure..."
     if ($IsDryRun) {
@@ -1177,7 +1176,7 @@ function StartIngest($IsDryRun) {
             $jobLabel = @($ClientVal, $EvtVal) | Where-Object { $_ -ne "" }
             $jobLabel = if ($jobLabel.Count -gt 0) { $jobLabel -join " - " } else { "Untitled job" }
             $totalFiles = $RawFiles.Count + $VideoFiles.Count + $AuxFiles.Count
-            $tgMessage = "Accurova Ingest complete - $jobLabel`n$totalFiles files, $(FormatBytes $TotalTransferBytes), ${elapsedStr}."
+            $tgMessage = "VaultFlow Ingest complete - $jobLabel`n$totalFiles files, $(FormatBytes $TotalTransferBytes), ${elapsedStr}."
             SendTelegramNotification $tgToken $tgChatId $tgMessage
         }
     }
@@ -1200,7 +1199,7 @@ try {
 } catch {
     [System.Windows.Forms.MessageBox]::Show(
         "Startup error:`n`n$($_.Exception.Message)`n`nLine: $($_.InvocationInfo.ScriptLineNumber)",
-        "Accurova - Error",
+        "VaultFlow - Error",
         [System.Windows.Forms.MessageBoxButtons]::OK,
         [System.Windows.Forms.MessageBoxIcon]::Error
     )

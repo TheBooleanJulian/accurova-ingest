@@ -1,8 +1,8 @@
 # ============================================================
-#  ACCUROVA - register the SD-card auto-launch scheduled task
+#  VAULTFLOW - register the SD-card auto-launch scheduled task
 #  Run this ONCE, from an elevated (Run as Administrator) PowerShell.
 #  It enables the device-connect event log and creates a Task
-#  Scheduler task that fires accurova_autolaunch.ps1 whenever
+#  Scheduler task that fires vaultflow_autolaunch.ps1 whenever
 #  Windows logs a new device starting (Event ID 2003 in
 #  Microsoft-Windows-DriverFrameworks-UserMode/Operational).
 # ============================================================
@@ -16,8 +16,8 @@ if (-not $isAdmin) {
 }
 
 $ScriptDir     = Split-Path -Parent $MyInvocation.MyCommand.Path
-$AutolaunchPs1 = Join-Path $ScriptDir "accurova_autolaunch.ps1"
-$TaskName      = "Accurova SD Card Autolaunch"
+$AutolaunchPs1 = Join-Path $ScriptDir "vaultflow_autolaunch.ps1"
+$TaskName      = "VaultFlow SD Card Autolaunch"
 
 wevtutil sl Microsoft-Windows-DriverFrameworks-UserMode/Operational /e:true
 Write-Host "Enabled Microsoft-Windows-DriverFrameworks-UserMode/Operational event log." -ForegroundColor Green
@@ -50,4 +50,4 @@ Register-ScheduledTask -TaskName $TaskName `
     -Force | Out-Null
 
 Write-Host "Registered scheduled task '$TaskName'." -ForegroundColor Green
-Write-Host "Insert an SD card to test - Accurova Ingest should pop up automatically." -ForegroundColor Green
+Write-Host "Insert an SD card to test - VaultFlow Ingest should pop up automatically." -ForegroundColor Green
