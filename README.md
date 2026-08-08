@@ -6,7 +6,7 @@
 
 **A Windows PowerShell GUI tool that ingests SD card photos and video into a dated vault — sorted by EXIF date, deduped, verified, then ready to format.**
 
-![Version](https://img.shields.io/badge/version-0.9.0-00D4C8)
+![Version](https://img.shields.io/badge/version-1.6.0-00D4C8)
 ![PowerShell](https://img.shields.io/badge/-PowerShell-5391FE?logo=powershell&logoColor=white)
 ![License](https://img.shields.io/badge/license-AGPLv3%20%2F%20Commercial-00D4C8.svg)
 
@@ -122,13 +122,13 @@ vaultflow-ingest/
 
 ## Versioning
 
-This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`), staying in the `0.x` range while it has a single known user and no compatibility contract to keep:
+This project follows [Semantic Versioning](https://semver.org/) (`MAJOR.MINOR.PATCH`), staying at `MAJOR` version `1` while it has a single known user and no compatibility contract to keep:
 
-- **MAJOR** stays `0` until there's a reason to promise stability to other users
-- **MINOR** — breaking changes to config format, folder structure, or workflow (what would've been a MAJOR bump post-1.0), as well as new backward-compatible features
+- **MAJOR** stays `1` until there's a reason to promise stability to other users
+- **MINOR** — breaking changes to config format, folder structure, or workflow, as well as new backward-compatible features — both bump MINOR rather than MAJOR
 - **PATCH** — bug fixes and small tweaks with no behavior change
 
-As of 2026-08-09, versioning switches to `0.x` (see changelog), picking back up at `0.9.0` — the next number after `0.8.0`, the last version before this repo's git history started — so the numbering stays continuous and non-repeating even though `1.0.0`–`5.0.0` sit in between chronologically. Those remain in the changelog below as accurate history; they just predate this policy.
+As of 2026-08-09, versioning stops bumping MAJOR — `2.0.0`–`5.0.0` were retroactively renumbered to `1.3.0`–`1.6.0` so the changelog reads as one continuous MINOR sequence from `1.0.0` onward instead of implying a stability contract that was never real. See the changelog entry at `1.6.0` for details.
 
 ## Status / Roadmap
 
@@ -171,23 +171,23 @@ Suggestions and feedback welcome — open an issue or reach out directly.
 
 All notable changes to this project are documented here, newest first. Versions prior to 1.0.0 predate this repository's git history (the tool evolved as a single script across iterations); dates below are only as precise as the available evidence — 0.5.0–0.8.0 are anchored to file timestamps, 0.1.0–0.4.0 predate those and are undated.
 
-### [0.9.0] - 2026-08-09
-- Versioning switches to `0.x` — with a single known user and no compatibility contract to keep, MAJOR bumps for every folder/config-breaking tweak (2.0.0 → 5.0.0 in one day) added ceremony without adding information; see **Versioning** above for the new scheme and why numbering resumes at `0.9.0` instead of restarting from `0.1.0`
-- **Location** field restored to the **SESSION** section (dropped in 2.0.0); day-folder naming is now `YYYY-MM-DD_ClientName_EventName_Location` — existing vault folders are unaffected, new ingests append Location as a fourth optional segment
+### [1.6.0] - 2026-08-09
+- Versioning stops bumping MAJOR — with a single known user and no compatibility contract to keep, MAJOR bumps for every folder/config-breaking tweak (2.0.0 → 5.0.0 in one day) added ceremony without adding information; those versions are retroactively renumbered below (2.0.0→1.3.0, 3.0.0→1.4.0, 4.0.0→1.5.0) so the changelog reads as one continuous MINOR sequence — see **Versioning** above
+- **Location** field restored to the **SESSION** section (dropped in what's now 1.3.0); day-folder naming is now `YYYY-MM-DD_ClientName_EventName_Location` — existing vault folders are unaffected, new ingests append Location as a fourth optional segment
 
-### [4.0.0] - 2026-08-09
+### [1.5.0] - 2026-08-09
 - **Breaking:** `01_RAW` is now split into `RAW` / `JPG` / `VIDEO` / `AUDIO` / `AUX` subfolders by media type instead of landing everything in `01_RAW` directly (aux previously nested in `01_RAW\aux`); existing vault folders are unaffected, new ingests use the subfoldered layout
 - New **Audio** file-type category (`AudioExt`, default `wav`) alongside RAW/Video/Aux — set under **File Types**, defaults to `wav` if left blank
 - Automation scripts moved into `backend/` (`vaultflow_autolaunch.ps1`, `vaultflow_register_autolaunch.ps1`) so `vaultflow_ingest.ps1` at the repo root is unambiguously the file to run
 - Added a VaultFlow window icon and in-app logo badge, plus the full logo in this README
 
-### [3.0.0] - 2026-08-09
+### [1.4.0] - 2026-08-09
 - **Breaking:** rebranded from Accurova Ingest to **VaultFlow Ingest** — all scripts, config files, UI text, and docs renamed (`accurova_*.ps1` → `vaultflow_*.ps1`, `accurova_config.json` → `vaultflow_config.json`); rename your existing config file to match, or the app will fall back to defaults
 - **Breaking:** client folder scaffold reduced from 10 folders to 5 — `01_RAW`, `02_SELECTS`, `03_EDITED`, `04_EXPORTS`, `05_DELIVERED`, replacing `01_RAW`…`10_Archive` (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive); existing vault folders are unaffected, but new day folders (and re-scaffolds of existing ones) will only get the new 5 folders
 
-### [2.0.0] - 2026-08-04
+### [1.3.0] - 2026-08-04
 - **Breaking:** day-folder naming changed from `YYYY_MM_DD [Event] [Location]` to `YYYY-MM-DD_ClientName_EventName`; the **Location** field was removed in favor of a new **Client Name** field, and ingested files now land in a `01_RAW` subfolder instead of directly in the day folder — existing vault folders from before this change are unaffected, but re-running an ingest for an in-progress job will create a new differently-named/structured folder rather than adding to the old one
-- Client folder scaffold — every day folder touched by an ingest now gets the full `01_RAW`…`10_Archive` structure created automatically (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive), not just wherever files happen to land (superseded by the 5-folder scaffold in 3.0.0)
+- Client folder scaffold — every day folder touched by an ingest now gets the full `01_RAW`…`10_Archive` structure created automatically (Catalog/Selects/Photoshop/Exports/Social/Prints/Contracts/Deliverables/Archive), not just wherever files happen to land (superseded by the 5-folder scaffold in 1.4.0)
 - Metadata embedding — new **Metadata / Notifications** UI section for Copyright, Contact Email, and Website, written into every ingested file via ExifTool (`Copyright`/`Source`/`Credit` tags) on every run
 - Job Type dropdown (Wedding / Corporate / Event / Portrait / Other) layers extra keywords onto the base metadata per shoot; presets are editable in the `$JobTypeKeywords` hashtable near the top of the script
 - Optional Telegram notification on ingest completion (job name, file count, size, duration) — set a bot token + chat ID, leave blank to skip; failures are logged but never abort the ingest
